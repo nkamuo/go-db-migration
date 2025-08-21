@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+
 	"github.com/nkamuo/go-db-migration/internal/config"
 	"github.com/nkamuo/go-db-migration/internal/models"
 )

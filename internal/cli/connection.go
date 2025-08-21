@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/nkamuo/go-db-migration/internal/database"
+	"github.com/spf13/cobra"
 )
 
 // newConnectionCmd creates the connection command group

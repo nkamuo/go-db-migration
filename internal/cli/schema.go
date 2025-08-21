@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/nkamuo/go-db-migration/internal/database"
 	"github.com/nkamuo/go-db-migration/internal/output"
 	"github.com/nkamuo/go-db-migration/internal/schema"
+	"github.com/spf13/cobra"
 )
 
 // newSchemaCmd creates the schema command group

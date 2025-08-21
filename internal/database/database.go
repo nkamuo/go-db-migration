@@ -6,7 +6,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
-	
+
 	"github.com/nkamuo/go-db-migration/internal/config"
 	"github.com/nkamuo/go-db-migration/internal/models"
 )
@@ -21,10 +21,10 @@ const (
 
 // DB represents a database connection wrapper with multi-vendor support
 type DB struct {
-	conn     *sql.DB
-	config   *config.DBConfig
-	dbType   DatabaseType
-	dialect  DatabaseDialect
+	conn    *sql.DB
+	config  *config.DBConfig
+	dbType  DatabaseType
+	dialect DatabaseDialect
 }
 
 // DatabaseDialect interface for vendor-specific SQL queries
@@ -211,7 +211,7 @@ func (db *DB) tableExists(tableName string) (bool, error) {
 		FROM information_schema.tables 
 		WHERE table_schema = 'public' 
 		  AND table_name = $1`
-	
+
 	var exists int
 	err := db.conn.QueryRow(query, tableName).Scan(&exists)
 	if err != nil {
@@ -279,7 +279,7 @@ func (db *DB) findForeignKeyViolations(fk models.ForeignKey) ([]models.Validatio
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute foreign key validation query for constraint '%s' (table: %s, column: %s, references: %s.%s): %w", 
+		return nil, fmt.Errorf("failed to execute foreign key validation query for constraint '%s' (table: %s, column: %s, references: %s.%s): %w",
 			fk.ConstraintName, fk.TableName, fk.ColumnName, fk.ReferencedTable, fk.ReferencedColumn, err)
 	}
 	defer rows.Close()

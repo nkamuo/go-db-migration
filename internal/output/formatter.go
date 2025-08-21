@@ -86,7 +86,7 @@ func (f *Formatter) formatValidationReportAsTable(report *models.ValidationRepor
 
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
-	
+
 	table.Header("Severity", "Type", "Table", "Column", "Message", "Identifier")
 
 	for _, issue := range report.Issues {
@@ -181,7 +181,7 @@ func (f *Formatter) formatSchemaComparisonAsTable(comparison *models.SchemaCompa
 		var buf bytes.Buffer
 		table := tablewriter.NewWriter(&buf)
 		table.Header("Missing Tables")
-		
+
 		for _, tableName := range comparison.MissingTables {
 			table.Append(tableName)
 		}
@@ -196,7 +196,7 @@ func (f *Formatter) formatSchemaComparisonAsTable(comparison *models.SchemaCompa
 		var buf bytes.Buffer
 		table := tablewriter.NewWriter(&buf)
 		table.Header("Extra Tables")
-		
+
 		for _, tableName := range comparison.ExtraTables {
 			table.Append(tableName)
 		}
@@ -279,14 +279,14 @@ func (f *Formatter) formatSchemaInfoAsTable(info *models.SchemaInfo) string {
 	var summaryBuf bytes.Buffer
 	summaryTable := tablewriter.NewWriter(&summaryBuf)
 	summaryTable.Header("Metric", "Value")
-	
+
 	summaryTable.Append([]string{"📁 Schema File", info.SchemaFile})
 	summaryTable.Append([]string{"🗂️  Total Tables", fmt.Sprintf("%d", info.TotalTables)})
 	summaryTable.Append([]string{"📋 Total Columns", fmt.Sprintf("%d", info.TotalColumns)})
 	summaryTable.Append([]string{"🔗 Foreign Keys", fmt.Sprintf("%d", info.TotalForeignKeys)})
 	summaryTable.Append([]string{"🚫 NOT NULL Columns", fmt.Sprintf("%d", info.NotNullColumns)})
 	summaryTable.Append([]string{"✅ Nullable Columns", fmt.Sprintf("%d", info.NullableColumns)})
-	
+
 	summaryTable.Render()
 	output.WriteString("📊 Schema Summary\n")
 	output.WriteString(summaryBuf.String())
@@ -297,11 +297,11 @@ func (f *Formatter) formatSchemaInfoAsTable(info *models.SchemaInfo) string {
 		var dataTypesBuf bytes.Buffer
 		dataTypesTable := tablewriter.NewWriter(&dataTypesBuf)
 		dataTypesTable.Header("Data Type", "Count")
-		
+
 		for dataType, count := range info.DataTypeCounts {
 			dataTypesTable.Append([]string{dataType, fmt.Sprintf("%d", count)})
 		}
-		
+
 		dataTypesTable.Render()
 		output.WriteString("📊 Data Types Distribution\n")
 		output.WriteString(dataTypesBuf.String())
@@ -313,7 +313,7 @@ func (f *Formatter) formatSchemaInfoAsTable(info *models.SchemaInfo) string {
 		var tablesBuf bytes.Buffer
 		tablesTable := tablewriter.NewWriter(&tablesBuf)
 		tablesTable.Header("Table Name", "Columns", "Foreign Keys")
-		
+
 		for _, tableSummary := range info.Tables {
 			tablesTable.Append([]string{
 				tableSummary.Name,
@@ -321,7 +321,7 @@ func (f *Formatter) formatSchemaInfoAsTable(info *models.SchemaInfo) string {
 				fmt.Sprintf("%d", tableSummary.ForeignKeyCount),
 			})
 		}
-		
+
 		tablesTable.Render()
 		output.WriteString("📋 Tables Detail\n")
 		output.WriteString(tablesBuf.String())

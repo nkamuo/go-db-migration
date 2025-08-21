@@ -1,17 +1,17 @@
 {
     "DB": {
         "default": {
-            "host": "localhost",
+            "host": "desktop-1.stsx.anvils.dev",
             "port": 5432,
-            "username": "user",
-            "password": "password",
-            "database": "mydb"
+            "username": "DBA",
+            "password": "p2programs",
+            "database": "stsx2"
         },
 
         "connections":[
             {
-                "name": "JAMES Database",
-                "database": "james_db"
+                "name": "01",
+                "database": "stsservoy_preview_test_01"
             }
         ]
         

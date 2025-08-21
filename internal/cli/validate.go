@@ -3,11 +3,11 @@ package cli
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/nkamuo/go-db-migration/internal/database"
 	"github.com/nkamuo/go-db-migration/internal/models"
 	"github.com/nkamuo/go-db-migration/internal/output"
 	"github.com/nkamuo/go-db-migration/internal/schema"
+	"github.com/spf13/cobra"
 )
 
 // newValidateCmd creates the validate command group
@@ -58,23 +58,21 @@ This command will:
 			// Connect to database
 			db, err := database.NewConnection(dbConfig)
 			if err != nil {
-				return fmt.Errorf("failed to connect to database: %w", err)
+				return fmt.Errorf("failed to connect to database '%s': %w\n\nPlease verify:\n- Database server is running\n- Connection details in config are correct\n- User has required permissions", dbConfig.Database, err)
 			}
 			defer db.Close()
 
 			// Load target schema
 			targetSchema, err := schema.LoadSchema(getSchemaFilePath())
 			if err != nil {
-				return fmt.Errorf("failed to load target schema: %w", err)
+				return fmt.Errorf("failed to load target schema from '%s': %w\n\nPlease verify:\n- Schema file exists and is readable\n- JSON format is valid", getSchemaFilePath(), err)
 			}
 
 			// Validate foreign keys
 			issues, err := db.ValidateForeignKeys(targetSchema)
 			if err != nil {
-				return fmt.Errorf("failed to validate foreign keys: %w", err)
-			}
-
-			// Create report
+				return fmt.Errorf("failed to validate foreign keys: %w\n\nThis error often occurs when:\n- Referenced tables don't exist in the database\n- Required columns are missing\n- Schema file contains invalid foreign key definitions", err)
+			} // Create report
 			report := output.CreateValidationReport(connectionName, issues)
 
 			// Format and output results
@@ -120,23 +118,21 @@ This command will:
 			// Connect to database
 			db, err := database.NewConnection(dbConfig)
 			if err != nil {
-				return fmt.Errorf("failed to connect to database: %w", err)
+				return fmt.Errorf("failed to connect to database '%s': %w\n\nPlease verify:\n- Database server is running\n- Connection details in config are correct\n- User has required permissions", dbConfig.Database, err)
 			}
 			defer db.Close()
 
 			// Load target schema
 			targetSchema, err := schema.LoadSchema(getSchemaFilePath())
 			if err != nil {
-				return fmt.Errorf("failed to load target schema: %w", err)
+				return fmt.Errorf("failed to load target schema from '%s': %w\n\nPlease verify:\n- Schema file exists and is readable\n- JSON format is valid", getSchemaFilePath(), err)
 			}
 
 			// Validate NOT NULL constraints
 			issues, err := db.ValidateNotNullConstraints(targetSchema)
 			if err != nil {
-				return fmt.Errorf("failed to validate NOT NULL constraints: %w", err)
-			}
-
-			// Create report
+				return fmt.Errorf("failed to validate NOT NULL constraints: %w\n\nThis error often occurs when:\n- Target tables don't exist in the database\n- Required columns are missing\n- Schema file contains invalid column definitions", err)
+			} // Create report
 			report := output.CreateValidationReport(connectionName, issues)
 
 			// Format and output results
@@ -181,14 +177,14 @@ This is a comprehensive check that combines:
 			// Connect to database
 			db, err := database.NewConnection(dbConfig)
 			if err != nil {
-				return fmt.Errorf("failed to connect to database: %w", err)
+				return fmt.Errorf("failed to connect to database '%s': %w\n\nPlease verify:\n- Database server is running\n- Connection details in config are correct\n- User has required permissions", dbConfig.Database, err)
 			}
 			defer db.Close()
 
 			// Load target schema
 			targetSchema, err := schema.LoadSchema(getSchemaFilePath())
 			if err != nil {
-				return fmt.Errorf("failed to load target schema: %w", err)
+				return fmt.Errorf("failed to load target schema from '%s': %w\n\nPlease verify:\n- Schema file exists and is readable\n- JSON format is valid", getSchemaFilePath(), err)
 			}
 
 			var allIssues []models.ValidationIssue
@@ -202,7 +198,7 @@ This is a comprehensive check that combines:
 			fmt.Println("🔍 Validating foreign key constraints...")
 			fkIssues, err := db.ValidateForeignKeys(targetSchema)
 			if err != nil {
-				return fmt.Errorf("failed to validate foreign keys: %w", err)
+				return fmt.Errorf("failed to validate foreign keys: %w\n\nThis error often occurs when:\n- Referenced tables don't exist in the database\n- Required columns are missing\n- Schema file contains invalid foreign key definitions", err)
 			}
 			allIssues = append(allIssues, fkIssues...)
 
@@ -210,7 +206,7 @@ This is a comprehensive check that combines:
 			fmt.Println("🔍 Validating NOT NULL constraints...")
 			nullIssues, err := db.ValidateNotNullConstraints(targetSchema)
 			if err != nil {
-				return fmt.Errorf("failed to validate NOT NULL constraints: %w", err)
+				return fmt.Errorf("failed to validate NOT NULL constraints: %w\n\nThis error often occurs when:\n- Target tables don't exist in the database\n- Required columns are missing\n- Schema file contains invalid column definitions", err)
 			}
 			allIssues = append(allIssues, nullIssues...)
 

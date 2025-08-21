@@ -10,7 +10,7 @@ import (
 
 // DBConfig represents a database configuration
 type DBConfig struct {
-	Type     string `json:"type" yaml:"type" mapstructure:"type"`             // postgres, mysql
+	Type     string `json:"type" yaml:"type" mapstructure:"type"` // postgres, mysql
 	Host     string `json:"host" yaml:"host" mapstructure:"host"`
 	Port     int    `json:"port" yaml:"port" mapstructure:"port"`
 	Username string `json:"username" yaml:"username" mapstructure:"username"`
@@ -88,7 +88,7 @@ func (c *Config) Validate() error {
 	if c.DB.Default.Type != "postgres" && c.DB.Default.Type != "mysql" {
 		return fmt.Errorf("default database type must be 'postgres' or 'mysql', got '%s'", c.DB.Default.Type)
 	}
-	
+
 	if c.DB.Default.Host == "" {
 		return fmt.Errorf("default database host is required")
 	}
