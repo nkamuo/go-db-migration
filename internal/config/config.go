@@ -129,8 +129,8 @@ func LoadConfig(configPath string) (*Config, error) {
 		v.SetConfigType("json")
 		v.AddConfigPath(".")
 		v.AddConfigPath("./config")
-		v.AddConfigPath("$HOME/.stsx-db-migration")
-		v.AddConfigPath("/etc/stsx-db-migration")
+		v.AddConfigPath("$HOME/.migrator")
+		v.AddConfigPath("/etc/migrator")
 	}
 
 	if err := v.ReadInConfig(); err != nil {

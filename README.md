@@ -72,28 +72,65 @@ The tool uses a `conf.json` file for database configuration:
 - **default**: Default database connection parameters
 - **connections**: Named connections that inherit from default and override specific values
 
+## Build
+
+### Using Make (Recommended)
+
+```bash
+# Build the binary
+make build
+
+# Run tests
+make test
+
+# Clean build artifacts
+make clean
+
+# Install dependencies
+make deps
+
+# Build for multiple platforms
+make build-all
+
+# Show all available commands
+make help
+```
+
+### Manual Build
+
+```bash
+# Build the migrator binary
+go build -o bin/migrator ./cmd/migrator
+
+# Or install directly
+go install ./cmd/migrator
+```
+
 ## Usage
 
 ### Basic Commands
 
 ```bash
 # Test database connection
-./stsx-db-migration test-connection
+./bin/migrator connection test
 
 # Validate schema file structure
-./stsx-db-migration validate-schema
+./bin/migrator schema validate
 
 # Check foreign key constraints
-./stsx-db-migration validate-fk
+./bin/migrator validate fk
 
 # Check NOT NULL constraints
-./stsx-db-migration validate-null
+./bin/migrator validate null
 
 # Compare current vs target schema
-./stsx-db-migration compare-schema
+./bin/migrator schema compare
 
 # Run all validations
-./stsx-db-migration validate-all
+./bin/migrator validate all
+
+# Show schema information
+./bin/migrator schema info
 ```
 
 ### Command Line Options
@@ -108,16 +145,22 @@ The tool uses a `conf.json` file for database configuration:
 
 ```bash
 # Use specific connection and output to file
-./stsx-db-migration validate-all --connection "JAMES Database" --output report.json --format json
+./bin/migrator validate all --connection "JAMES Database" --output report.json --format json
 
 # Validate foreign keys with YAML output
-./stsx-db-migration validate-fk --format yaml
+./bin/migrator validate fk --format yaml
 
 # Compare schemas and save as CSV
-./stsx-db-migration compare-schema --format csv --output schema-diff.csv
+./bin/migrator schema compare --format csv --output schema-diff.csv
 
 # Test connection to specific database
-./stsx-db-migration test-connection --connection "JAMES Database"
+./bin/migrator connection test --connection "JAMES Database"
+
+# Display schema information in JSON format
+./bin/migrator schema info --format json
+
+# Get help for specific command
+./bin/migrator validate --help
 ```
 
 ## Schema File Format
@@ -271,13 +314,18 @@ The tool provides comprehensive error handling with clear messages:
 
 ```bash
 # Show all available commands
-./stsx-db-migration help
+./bin/migrator help
 
 # Get help for specific command
-./stsx-db-migration validate-fk --help
+./bin/migrator validate fk --help
 
 # Check version information
-./stsx-db-migration version
+./bin/migrator version
+
+# Show nested command help
+./bin/migrator schema --help
+./bin/migrator validate --help
+./bin/migrator connection --help
 ```
 
 ## License
