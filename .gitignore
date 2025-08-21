@@ -1,3 +1,6 @@
-/bin/migrator
-/bin
+# Ignore binaries in bin directory, but keep the directory and its .gitignore
+/bin/*
+!/bin/.gitignore
+
+# Ignore distribution directory
 /dist

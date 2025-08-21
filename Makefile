@@ -23,7 +23,18 @@ LDFLAGS=-ldflags "-X 'github.com/nkamuo/go-db-migration/internal/cli.Version=$(V
 # Target platforms
 PLATFORMS=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
-.PHONY: all build clean test deps lint help build-all build-windows package-windows package-all
+# Ensure bin directory structure exists
+setup-bin:
+	@mkdir -p bin
+	@if [ ! -f bin/.gitignore ]; then \
+		echo "# Ignore all files in this directory" > bin/.gitignore; \
+		echo "*" >> bin/.gitignore; \
+		echo "" >> bin/.gitignore; \
+		echo "# But don't ignore this .gitignore file itself" >> bin/.gitignore; \
+		echo "!.gitignore" >> bin/.gitignore; \
+	fi
+
+.PHONY: all build clean test deps lint help build-all build-windows package-windows package-all setup-bin
 
 all: clean deps build
 
@@ -45,13 +56,12 @@ help:
 	@echo "Supported platforms: linux/amd64, linux/386, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64"
 
 ## build: Build the binary for current platform
-build:
+build: setup-bin
 	$(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME) ./cmd/migrator
 
 ## build-all: Build for multiple platforms
-build-all: clean deps
+build-all: clean deps setup-bin
 	@echo "Building for multiple platforms..."
-	@mkdir -p bin
 	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME)-linux-amd64 ./cmd/migrator
 	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME)-linux-arm64 ./cmd/migrator
 	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME)-darwin-amd64 ./cmd/migrator
@@ -61,9 +71,8 @@ build-all: clean deps
 	@echo "All platform builds complete!"
 
 ## build-windows: Build for Windows (amd64 and arm64)
-build-windows:
+build-windows: setup-bin
 	@echo "Building for Windows platforms..."
-	@mkdir -p bin
 	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME)-windows-amd64.exe ./cmd/migrator
 	GOOS=windows GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME)-windows-arm64.exe ./cmd/migrator
 	@echo "Windows builds complete!"

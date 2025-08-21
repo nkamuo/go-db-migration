@@ -204,6 +204,25 @@ func (db *DB) getTableForeignKeys(tableName string) ([]models.ForeignKey, error)
 	return foreignKeys, rows.Err()
 }
 
+// tableExists checks if a table exists in the database
+func (db *DB) tableExists(tableName string) (bool, error) {
+	query := `
+		SELECT 1 
+		FROM information_schema.tables 
+		WHERE table_schema = 'public' 
+		  AND table_name = $1`
+	
+	var exists int
+	err := db.conn.QueryRow(query, tableName).Scan(&exists)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 // ValidateForeignKeys checks for foreign key constraint violations
 func (db *DB) ValidateForeignKeys(targetSchema models.Schema) ([]models.ValidationIssue, error) {
 	var issues []models.ValidationIssue
@@ -223,14 +242,31 @@ func (db *DB) ValidateForeignKeys(targetSchema models.Schema) ([]models.Validati
 
 // findForeignKeyViolations finds records that violate a foreign key constraint
 func (db *DB) findForeignKeyViolations(fk models.ForeignKey) ([]models.ValidationIssue, error) {
+	// First, check if both tables exist
+	sourceExists, err := db.tableExists(fk.TableName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if source table '%s' exists: %w", fk.TableName, err)
+	}
+	if !sourceExists {
+		return nil, fmt.Errorf("source table '%s' does not exist in the database", fk.TableName)
+	}
+
+	referencedExists, err := db.tableExists(fk.ReferencedTable)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if referenced table '%s' exists: %w", fk.ReferencedTable, err)
+	}
+	if !referencedExists {
+		return nil, fmt.Errorf("referenced table '%s' does not exist in the database (required by foreign key constraint '%s')", fk.ReferencedTable, fk.ConstraintName)
+	}
+
 	// Build query to find orphaned records
 	query := fmt.Sprintf(`
 		SELECT %s, %s
-		FROM %s t1
+		FROM %s AS source_table
 		WHERE %s IS NOT NULL
 		  AND NOT EXISTS (
-			SELECT 1 FROM %s t2 
-			WHERE t2.%s = t1.%s
+			SELECT 1 FROM %s AS ref_table
+			WHERE ref_table.%s = source_table.%s
 		  )
 		LIMIT 1000`, // Limit to prevent overwhelming output
 		fk.ColumnName,
@@ -243,7 +279,8 @@ func (db *DB) findForeignKeyViolations(fk models.ForeignKey) ([]models.Validatio
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to execute foreign key validation query for constraint '%s' (table: %s, column: %s, references: %s.%s): %w", 
+			fk.ConstraintName, fk.TableName, fk.ColumnName, fk.ReferencedTable, fk.ReferencedColumn, err)
 	}
 	defer rows.Close()
 
