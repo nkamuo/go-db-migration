@@ -5,7 +5,8 @@
             "port": 5432,
             "username": "DBA",
             "password": "p2programs",
-            "database": "stsx2"
+            "database": "stsx2",
+            "sslmode": "disable"
         },
 
         "connections":[

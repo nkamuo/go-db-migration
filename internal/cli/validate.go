@@ -43,43 +43,91 @@ This command will:
 		Aliases: []string{"foreign-key", "foreign-keys"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Disable usage on error for clean output
+			cmd.SilenceUsage = true
+			
 			// Load configuration
 			cfg, err := getConfigFromCmd(cmd)
 			if err != nil {
-				return err
+				fmt.Printf("❌ Configuration Error\n\n")
+				fmt.Printf("Failed to load configuration: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Check if conf.json exists in the current directory\n")
+				fmt.Printf("   • Verify JSON syntax is valid\n")
+				fmt.Printf("   • Use --config flag to specify a different config file\n\n")
+				return nil
 			}
 
 			// Get connection config
 			dbConfig, err := cfg.GetConnectionConfig(connectionName)
 			if err != nil {
-				return err
+				fmt.Printf("❌ Connection Configuration Error\n\n")
+				fmt.Printf("Failed to get connection config: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Check connection name in conf.json\n")
+				fmt.Printf("   • Use --connection flag to specify a valid connection\n")
+				fmt.Printf("   • Verify default connection is properly configured\n\n")
+				return nil
 			}
 
 			// Connect to database
 			db, err := database.NewConnection(dbConfig)
 			if err != nil {
-				return fmt.Errorf("failed to connect to database '%s': %w\n\nPlease verify:\n- Database server is running\n- Connection details in config are correct\n- User has required permissions", dbConfig.Database, err)
+				fmt.Printf("❌ Database Connection Failed\n\n")
+				fmt.Printf("Database: %s\n", dbConfig.Database)
+				fmt.Printf("Host: %s:%d\n", dbConfig.Host, dbConfig.Port)
+				fmt.Printf("User: %s\n\n", dbConfig.Username)
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify database server is running\n")
+				fmt.Printf("   • Check connection details in config are correct\n")
+				fmt.Printf("   • Ensure user has required permissions\n")
+				fmt.Printf("   • Check firewall/network connectivity\n")
+				fmt.Printf("   • Verify pg_hba.conf allows your IP address\n\n")
+				return nil
 			}
 			defer db.Close()
 
 			// Load target schema
 			targetSchema, err := schema.LoadSchema(getSchemaFilePath())
 			if err != nil {
-				return fmt.Errorf("failed to load target schema from '%s': %w\n\nPlease verify:\n- Schema file exists and is readable\n- JSON format is valid", getSchemaFilePath(), err)
+				fmt.Printf("❌ Schema Loading Failed\n\n")
+				fmt.Printf("Schema file: %s\n\n", getSchemaFilePath())
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Verify schema file exists and is readable\n")
+				fmt.Printf("   • Check JSON format is valid\n")
+				fmt.Printf("   • Use --schema flag to specify correct file path\n\n")
+				return nil
 			}
 
 			// Validate foreign keys
 			issues, err := db.ValidateForeignKeys(targetSchema)
 			if err != nil {
-				return fmt.Errorf("failed to validate foreign keys: %w\n\nThis error often occurs when:\n- Referenced tables don't exist in the database\n- Required columns are missing\n- Schema file contains invalid foreign key definitions", err)
-			} // Create report
+				fmt.Printf("❌ Foreign Key Validation Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify that all referenced tables exist in the database\n")
+				fmt.Printf("   • Check that required columns are present\n")
+				fmt.Printf("   • Validate your schema file contains correct foreign key definitions\n")
+				fmt.Printf("   • Ensure database connection has proper permissions\n\n")
+				fmt.Printf("🔧 Debug Steps:\n")
+				fmt.Printf("   1. Run: ./bin/migrator schema info\n")
+				fmt.Printf("   2. Check which tables exist in your database\n")
+				fmt.Printf("   3. Compare with foreign key references in schema.json\n\n")
+				return nil
+			}
+
+			// Create report
 			report := output.CreateValidationReport(connectionName, issues)
 
 			// Format and output results
 			formatter := output.NewFormatter(outputFormat)
 			content, err := formatter.FormatValidationReport(report)
 			if err != nil {
-				return fmt.Errorf("failed to format output: %w", err)
+				fmt.Printf("❌ Output Formatting Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				return nil
 			}
 
 			return saveOutput(content, cmd)
@@ -103,43 +151,91 @@ This command will:
 		Aliases: []string{"not-null", "nulls"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Disable usage on error for clean output
+			cmd.SilenceUsage = true
+			
 			// Load configuration
 			cfg, err := getConfigFromCmd(cmd)
 			if err != nil {
-				return err
+				fmt.Printf("❌ Configuration Error\n\n")
+				fmt.Printf("Failed to load configuration: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Check if conf.json exists in the current directory\n")
+				fmt.Printf("   • Verify JSON syntax is valid\n")
+				fmt.Printf("   • Use --config flag to specify a different config file\n\n")
+				return nil
 			}
 
 			// Get connection config
 			dbConfig, err := cfg.GetConnectionConfig(connectionName)
 			if err != nil {
-				return err
+				fmt.Printf("❌ Connection Configuration Error\n\n")
+				fmt.Printf("Failed to get connection config: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Check connection name in conf.json\n")
+				fmt.Printf("   • Use --connection flag to specify a valid connection\n")
+				fmt.Printf("   • Verify default connection is properly configured\n\n")
+				return nil
 			}
 
 			// Connect to database
 			db, err := database.NewConnection(dbConfig)
 			if err != nil {
-				return fmt.Errorf("failed to connect to database '%s': %w\n\nPlease verify:\n- Database server is running\n- Connection details in config are correct\n- User has required permissions", dbConfig.Database, err)
+				fmt.Printf("❌ Database Connection Failed\n\n")
+				fmt.Printf("Database: %s\n", dbConfig.Database)
+				fmt.Printf("Host: %s:%d\n", dbConfig.Host, dbConfig.Port)
+				fmt.Printf("User: %s\n\n", dbConfig.Username)
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify database server is running\n")
+				fmt.Printf("   • Check connection details in config are correct\n")
+				fmt.Printf("   • Ensure user has required permissions\n")
+				fmt.Printf("   • Check firewall/network connectivity\n")
+				fmt.Printf("   • Verify pg_hba.conf allows your IP address\n\n")
+				return nil
 			}
 			defer db.Close()
 
 			// Load target schema
 			targetSchema, err := schema.LoadSchema(getSchemaFilePath())
 			if err != nil {
-				return fmt.Errorf("failed to load target schema from '%s': %w\n\nPlease verify:\n- Schema file exists and is readable\n- JSON format is valid", getSchemaFilePath(), err)
+				fmt.Printf("❌ Schema Loading Failed\n\n")
+				fmt.Printf("Schema file: %s\n\n", getSchemaFilePath())
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Verify schema file exists and is readable\n")
+				fmt.Printf("   • Check JSON format is valid\n")
+				fmt.Printf("   • Use --schema flag to specify correct file path\n\n")
+				return nil
 			}
 
 			// Validate NOT NULL constraints
 			issues, err := db.ValidateNotNullConstraints(targetSchema)
 			if err != nil {
-				return fmt.Errorf("failed to validate NOT NULL constraints: %w\n\nThis error often occurs when:\n- Target tables don't exist in the database\n- Required columns are missing\n- Schema file contains invalid column definitions", err)
-			} // Create report
+				fmt.Printf("❌ NOT NULL Validation Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify that target tables exist in the database\n")
+				fmt.Printf("   • Check that required columns are present\n")
+				fmt.Printf("   • Validate your schema file contains correct column definitions\n")
+				fmt.Printf("   • Ensure database connection has proper permissions\n\n")
+				fmt.Printf("🔧 Debug Steps:\n")
+				fmt.Printf("   1. Run: ./bin/migrator schema info\n")
+				fmt.Printf("   2. Check which tables and columns exist in your database\n")
+				fmt.Printf("   3. Compare with NOT NULL constraints in schema.json\n\n")
+				return nil
+			}
+
+			// Create report
 			report := output.CreateValidationReport(connectionName, issues)
 
 			// Format and output results
 			formatter := output.NewFormatter(outputFormat)
 			content, err := formatter.FormatValidationReport(report)
 			if err != nil {
-				return fmt.Errorf("failed to format output: %w", err)
+				fmt.Printf("❌ Output Formatting Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				return nil
 			}
 
 			return saveOutput(content, cmd)
@@ -162,29 +258,62 @@ This is a comprehensive check that combines:
 - Data integrity checks`,
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Disable usage on error for clean output
+			cmd.SilenceUsage = true
+			
 			// Load configuration
 			cfg, err := getConfigFromCmd(cmd)
 			if err != nil {
-				return err
+				fmt.Printf("❌ Configuration Error\n\n")
+				fmt.Printf("Failed to load configuration: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Check if conf.json exists in the current directory\n")
+				fmt.Printf("   • Verify JSON syntax is valid\n")
+				fmt.Printf("   • Use --config flag to specify a different config file\n\n")
+				return nil
 			}
 
 			// Get connection config
 			dbConfig, err := cfg.GetConnectionConfig(connectionName)
 			if err != nil {
-				return err
+				fmt.Printf("❌ Connection Configuration Error\n\n")
+				fmt.Printf("Failed to get connection config: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Check connection name in conf.json\n")
+				fmt.Printf("   • Use --connection flag to specify a valid connection\n")
+				fmt.Printf("   • Verify default connection is properly configured\n\n")
+				return nil
 			}
 
 			// Connect to database
 			db, err := database.NewConnection(dbConfig)
 			if err != nil {
-				return fmt.Errorf("failed to connect to database '%s': %w\n\nPlease verify:\n- Database server is running\n- Connection details in config are correct\n- User has required permissions", dbConfig.Database, err)
+				fmt.Printf("❌ Database Connection Failed\n\n")
+				fmt.Printf("Database: %s\n", dbConfig.Database)
+				fmt.Printf("Host: %s:%d\n", dbConfig.Host, dbConfig.Port)
+				fmt.Printf("User: %s\n\n", dbConfig.Username)
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify database server is running\n")
+				fmt.Printf("   • Check connection details in config are correct\n")
+				fmt.Printf("   • Ensure user has required permissions\n")
+				fmt.Printf("   • Check firewall/network connectivity\n")
+				fmt.Printf("   • Verify pg_hba.conf allows your IP address\n\n")
+				return nil
 			}
 			defer db.Close()
 
 			// Load target schema
 			targetSchema, err := schema.LoadSchema(getSchemaFilePath())
 			if err != nil {
-				return fmt.Errorf("failed to load target schema from '%s': %w\n\nPlease verify:\n- Schema file exists and is readable\n- JSON format is valid", getSchemaFilePath(), err)
+				fmt.Printf("❌ Schema Loading Failed\n\n")
+				fmt.Printf("Schema file: %s\n\n", getSchemaFilePath())
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Verify schema file exists and is readable\n")
+				fmt.Printf("   • Check JSON format is valid\n")
+				fmt.Printf("   • Use --schema flag to specify correct file path\n\n")
+				return nil
 			}
 
 			var allIssues []models.ValidationIssue
@@ -196,17 +325,31 @@ This is a comprehensive check that combines:
 
 			// 2. Validate foreign keys
 			fmt.Println("🔍 Validating foreign key constraints...")
-			fkIssues, err := db.ValidateForeignKeys(targetSchema)
+			var fkIssues []models.ValidationIssue
+			fkIssues, err = db.ValidateForeignKeys(targetSchema)
 			if err != nil {
-				return fmt.Errorf("failed to validate foreign keys: %w\n\nThis error often occurs when:\n- Referenced tables don't exist in the database\n- Required columns are missing\n- Schema file contains invalid foreign key definitions", err)
+				fmt.Printf("❌ Foreign Key Validation Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify that all referenced tables exist in the database\n")
+				fmt.Printf("   • Check that required columns are present\n")
+				fmt.Printf("   • Validate your schema file contains correct foreign key definitions\n\n")
+				return nil
 			}
 			allIssues = append(allIssues, fkIssues...)
 
 			// 3. Validate NOT NULL constraints
 			fmt.Println("🔍 Validating NOT NULL constraints...")
-			nullIssues, err := db.ValidateNotNullConstraints(targetSchema)
+			var nullIssues []models.ValidationIssue
+			nullIssues, err = db.ValidateNotNullConstraints(targetSchema)
 			if err != nil {
-				return fmt.Errorf("failed to validate NOT NULL constraints: %w\n\nThis error often occurs when:\n- Target tables don't exist in the database\n- Required columns are missing\n- Schema file contains invalid column definitions", err)
+				fmt.Printf("❌ NOT NULL Validation Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify that target tables exist in the database\n")
+				fmt.Printf("   • Check that required columns are present\n")
+				fmt.Printf("   • Validate your schema file contains correct column definitions\n\n")
+				return nil
 			}
 			allIssues = append(allIssues, nullIssues...)
 
@@ -217,7 +360,9 @@ This is a comprehensive check that combines:
 			formatter := output.NewFormatter(outputFormat)
 			content, err := formatter.FormatValidationReport(report)
 			if err != nil {
-				return fmt.Errorf("failed to format output: %w", err)
+				fmt.Printf("❌ Output Formatting Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				return nil
 			}
 
 			return saveOutput(content, cmd)

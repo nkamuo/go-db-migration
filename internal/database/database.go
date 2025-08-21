@@ -229,6 +229,11 @@ func (db *DB) ValidateForeignKeys(targetSchema models.Schema) ([]models.Validati
 
 	for _, table := range targetSchema {
 		for _, fk := range table.ForeignKeys {
+			// Ensure the foreign key has the table name set (it might not be in the JSON)
+			if fk.TableName == "" {
+				fk.TableName = table.TableName
+			}
+			
 			violations, err := db.findForeignKeyViolations(fk)
 			if err != nil {
 				return nil, fmt.Errorf("failed to validate foreign key %s: %w", fk.ConstraintName, err)
