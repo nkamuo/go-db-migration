@@ -18,8 +18,8 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "stsx-db-migration",
-	Short: "Database migration validation tool",
+	Use:   "migrator",
+	Short: "Database Migration Validator - A robust tool for validating database schemas",
 	Long: `A robust database validation tool designed to identify potential issues 
 that could prevent successful database migrations.
 
@@ -31,16 +31,16 @@ This tool can:
 
 Examples:
   # Validate foreign keys using default connection
-  stsx-db-migration validate fk
+  migrator validate fk
 
   # Check null constraints with specific connection
-  stsx-db-migration validate null --connection "JAMES Database"
+  migrator validate null --connection "JAMES Database"
 
   # Compare schemas and output to JSON
-  stsx-db-migration schema compare --format json --output report.json
+  migrator schema compare --format json --output report.json
 
   # Test database connection
-  stsx-db-migration connection test --connection "JAMES Database"`,
+  migrator connection test --connection "JAMES Database"`,
 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip validation for help, version, and schema info commands

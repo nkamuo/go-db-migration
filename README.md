@@ -23,8 +23,8 @@ A robust Go program designed to identify potential issues that could prevent suc
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd stsx-10-20-db-migration
+git clone https://github.com/nkamuo/go-db-migration.git
+cd db-migration
 
 # Install dependencies
 make deps

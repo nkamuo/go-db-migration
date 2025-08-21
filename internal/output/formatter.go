@@ -84,20 +84,20 @@ func (f *Formatter) formatValidationReportAsTable(report *models.ValidationRepor
 		return "✅ No validation issues found!\n"
 	}
 
-	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
-	t.SetTitle("Database Validation Report")
-	t.AppendHeader(table.Row{"Severity", "Type", "Table", "Column", "Message", "Identifier"})
+	var buf bytes.Buffer
+	table := tablewriter.NewWriter(&buf)
+	
+	table.Header("Severity", "Type", "Table", "Column", "Message", "Identifier")
 
 	for _, issue := range report.Issues {
 		severity := issue.Severity
 		if severity == "error" {
-			severity = text.FgHiRed.Sprint("ERROR")
+			severity = "ERROR"
 		} else if severity == "warning" {
-			severity = text.FgHiYellow.Sprint("WARNING")
+			severity = "WARNING"
 		}
 
-		t.AppendRow(table.Row{
+		table.Append([]string{
 			severity,
 			issue.Type,
 			issue.Table,
@@ -107,8 +107,8 @@ func (f *Formatter) formatValidationReportAsTable(report *models.ValidationRepor
 		})
 	}
 
-	t.AppendSeparator()
-	t.AppendFooter(table.Row{
+	// Add summary footer
+	table.Append([]string{
 		"Summary",
 		fmt.Sprintf("Total: %d", report.Summary.TotalIssues),
 		fmt.Sprintf("Errors: %d", report.Summary.ErrorCount),
@@ -117,8 +117,8 @@ func (f *Formatter) formatValidationReportAsTable(report *models.ValidationRepor
 		fmt.Sprintf("Connection: %s", report.ConnectionName),
 	})
 
-	t.SetStyle(table.StyleColoredBright)
-	return t.Render()
+	table.Render()
+	return buf.String()
 }
 
 // formatValidationReportAsJSON formats the validation report as JSON
@@ -174,58 +174,64 @@ func (f *Formatter) formatValidationReportAsCSV(report *models.ValidationReport)
 
 // formatSchemaComparisonAsTable formats the schema comparison as a table
 func (f *Formatter) formatSchemaComparisonAsTable(comparison *models.SchemaComparison) string {
-	var output string
+	var output strings.Builder
 
 	// Missing tables
 	if len(comparison.MissingTables) > 0 {
-		t := table.NewWriter()
-		t.SetTitle("Missing Tables")
-		t.AppendHeader(table.Row{"Table Name"})
+		var buf bytes.Buffer
+		table := tablewriter.NewWriter(&buf)
+		table.Header("Missing Tables")
+		
 		for _, tableName := range comparison.MissingTables {
-			t.AppendRow(table.Row{text.FgRed.Sprint(tableName)})
+			table.Append(tableName)
 		}
-		t.SetStyle(table.StyleColoredBright)
-		output += t.Render() + "\n\n"
+		table.Render()
+		output.WriteString("Missing Tables:\n")
+		output.WriteString(buf.String())
+		output.WriteString("\n")
 	}
 
 	// Extra tables
 	if len(comparison.ExtraTables) > 0 {
-		t := table.NewWriter()
-		t.SetTitle("Extra Tables")
-		t.AppendHeader(table.Row{"Table Name"})
+		var buf bytes.Buffer
+		table := tablewriter.NewWriter(&buf)
+		table.Header("Extra Tables")
+		
 		for _, tableName := range comparison.ExtraTables {
-			t.AppendRow(table.Row{text.FgYellow.Sprint(tableName)})
+			table.Append(tableName)
 		}
-		t.SetStyle(table.StyleColoredBright)
-		output += t.Render() + "\n\n"
+		table.Render()
+		output.WriteString("Extra Tables:\n")
+		output.WriteString(buf.String())
+		output.WriteString("\n")
 	}
 
 	// Table differences
 	for tableName, diff := range comparison.TableDifferences {
 		if len(diff.MissingColumns) > 0 || len(diff.ExtraColumns) > 0 || len(diff.ModifiedColumns) > 0 {
-			t := table.NewWriter()
-			t.SetTitle(fmt.Sprintf("Table: %s", tableName))
-			t.AppendHeader(table.Row{"Change Type", "Column", "Details"})
+			var buf bytes.Buffer
+			table := tablewriter.NewWriter(&buf)
+			table.Header("Change Type", "Column", "Details")
 
 			for _, col := range diff.MissingColumns {
-				t.AppendRow(table.Row{
-					text.FgRed.Sprint("MISSING"),
+				table.Append([]string{
+					"MISSING",
 					col.ColumnName,
 					fmt.Sprintf("%s, %s", col.DataType, col.IsNullable),
 				})
 			}
 
 			for _, col := range diff.ExtraColumns {
-				t.AppendRow(table.Row{
-					text.FgYellow.Sprint("EXTRA"),
+				table.Append([]string{
+					"EXTRA",
 					col.ColumnName,
 					fmt.Sprintf("%s, %s", col.DataType, col.IsNullable),
 				})
 			}
 
 			for colName, colDiff := range diff.ModifiedColumns {
-				t.AppendRow(table.Row{
-					text.FgBlue.Sprint("MODIFIED"),
+				table.Append([]string{
+					"MODIFIED",
 					colName,
 					fmt.Sprintf("Current: %s (%s) → Target: %s (%s)",
 						colDiff.Current.DataType, colDiff.Current.IsNullable,
@@ -233,16 +239,18 @@ func (f *Formatter) formatSchemaComparisonAsTable(comparison *models.SchemaCompa
 				})
 			}
 
-			t.SetStyle(table.StyleColoredBright)
-			output += t.Render() + "\n\n"
+			table.Render()
+			output.WriteString(fmt.Sprintf("Table: %s\n", tableName))
+			output.WriteString(buf.String())
+			output.WriteString("\n")
 		}
 	}
 
-	if output == "" {
-		output = "✅ No schema differences found!\n"
+	if output.Len() == 0 {
+		return "✅ No schema differences found!\n"
 	}
 
-	return output
+	return output.String()
 }
 
 // formatSchemaComparisonAsJSON formats the schema comparison as JSON
@@ -265,56 +273,61 @@ func (f *Formatter) formatSchemaComparisonAsYAML(comparison *models.SchemaCompar
 
 // formatSchemaInfoAsTable formats the schema info as a table
 func (f *Formatter) formatSchemaInfoAsTable(info *models.SchemaInfo) string {
-	var output string
+	var output strings.Builder
 
 	// Summary information table
-	summaryTable := table.NewWriter()
-	summaryTable.SetTitle("📊 Schema Summary")
-	summaryTable.AppendHeader(table.Row{"Metric", "Value"})
+	var summaryBuf bytes.Buffer
+	summaryTable := tablewriter.NewWriter(&summaryBuf)
+	summaryTable.Header("Metric", "Value")
 	
-	summaryTable.AppendRow(table.Row{"📁 Schema File", info.SchemaFile})
-	summaryTable.AppendRow(table.Row{"🗂️  Total Tables", info.TotalTables})
-	summaryTable.AppendRow(table.Row{"📋 Total Columns", info.TotalColumns})
-	summaryTable.AppendRow(table.Row{"🔗 Foreign Keys", info.TotalForeignKeys})
-	summaryTable.AppendRow(table.Row{"🚫 NOT NULL Columns", info.NotNullColumns})
-	summaryTable.AppendRow(table.Row{"✅ Nullable Columns", info.NullableColumns})
+	summaryTable.Append([]string{"📁 Schema File", info.SchemaFile})
+	summaryTable.Append([]string{"🗂️  Total Tables", fmt.Sprintf("%d", info.TotalTables)})
+	summaryTable.Append([]string{"📋 Total Columns", fmt.Sprintf("%d", info.TotalColumns)})
+	summaryTable.Append([]string{"🔗 Foreign Keys", fmt.Sprintf("%d", info.TotalForeignKeys)})
+	summaryTable.Append([]string{"🚫 NOT NULL Columns", fmt.Sprintf("%d", info.NotNullColumns)})
+	summaryTable.Append([]string{"✅ Nullable Columns", fmt.Sprintf("%d", info.NullableColumns)})
 	
-	summaryTable.SetStyle(table.StyleColoredBright)
-	output += summaryTable.Render() + "\n\n"
+	summaryTable.Render()
+	output.WriteString("📊 Schema Summary\n")
+	output.WriteString(summaryBuf.String())
+	output.WriteString("\n")
 
 	// Data types table
 	if len(info.DataTypeCounts) > 0 {
-		dataTypesTable := table.NewWriter()
-		dataTypesTable.SetTitle("📊 Data Types Distribution")
-		dataTypesTable.AppendHeader(table.Row{"Data Type", "Count"})
+		var dataTypesBuf bytes.Buffer
+		dataTypesTable := tablewriter.NewWriter(&dataTypesBuf)
+		dataTypesTable.Header("Data Type", "Count")
 		
 		for dataType, count := range info.DataTypeCounts {
-			dataTypesTable.AppendRow(table.Row{dataType, count})
+			dataTypesTable.Append([]string{dataType, fmt.Sprintf("%d", count)})
 		}
 		
-		dataTypesTable.SetStyle(table.StyleColoredBright)
-		output += dataTypesTable.Render() + "\n\n"
+		dataTypesTable.Render()
+		output.WriteString("📊 Data Types Distribution\n")
+		output.WriteString(dataTypesBuf.String())
+		output.WriteString("\n")
 	}
 
 	// Tables detail
 	if len(info.Tables) > 0 {
-		tablesTable := table.NewWriter()
-		tablesTable.SetTitle("📋 Tables Detail")
-		tablesTable.AppendHeader(table.Row{"Table Name", "Columns", "Foreign Keys"})
+		var tablesBuf bytes.Buffer
+		tablesTable := tablewriter.NewWriter(&tablesBuf)
+		tablesTable.Header("Table Name", "Columns", "Foreign Keys")
 		
 		for _, tableSummary := range info.Tables {
-			tablesTable.AppendRow(table.Row{
+			tablesTable.Append([]string{
 				tableSummary.Name,
-				tableSummary.ColumnCount,
-				tableSummary.ForeignKeyCount,
+				fmt.Sprintf("%d", tableSummary.ColumnCount),
+				fmt.Sprintf("%d", tableSummary.ForeignKeyCount),
 			})
 		}
 		
-		tablesTable.SetStyle(table.StyleColoredBright)
-		output += tablesTable.Render()
+		tablesTable.Render()
+		output.WriteString("📋 Tables Detail\n")
+		output.WriteString(tablesBuf.String())
 	}
 
-	return output
+	return output.String()
 }
 
 // formatSchemaInfoAsJSON formats the schema info as JSON
