@@ -7,6 +7,8 @@ A robust Go program designed to identify potential issues that could prevent suc
 - **Foreign Key Validation**: Identifies records that would violate foreign key constraints during migration
 - **NOT NULL Constraint Validation**: Finds null values in columns that will be made NOT NULL
 - **Schema Comparison**: Compares current database schema with target schema
+- **Schema Export**: Export complete database schema with vendor-specific data types and full metadata
+- **Schema Snapshots**: Create simplified schema snapshots for version tracking and quick comparisons
 - **Multiple Output Formats**: Supports table, JSON, YAML, and CSV output formats
 - **Flexible Configuration**: Supports multiple database connections with fallback to defaults
 - **Enterprise-Ready**: Robust error handling, logging, and validation
@@ -131,6 +133,12 @@ go install ./cmd/migrator
 
 # Show schema information
 ./bin/migrator schema info
+
+# Export complete database schema with full metadata
+./bin/migrator schema export --format json -o database-schema.json
+
+# Create simplified schema snapshot for version tracking
+./bin/migrator schema snapshot --format json -o schema-snapshot.json
 ```
 
 ### Command Line Options

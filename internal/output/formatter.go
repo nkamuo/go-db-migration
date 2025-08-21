@@ -94,6 +94,18 @@ func (f *Formatter) FormatSchema(schema models.Schema) (string, error) {
 	}
 }
 
+// FormatSchemaSnapshot formats a schema snapshot in simplified format
+func (f *Formatter) FormatSchemaSnapshot(schema models.Schema) (string, error) {
+	switch f.format {
+	case FormatJSON:
+		return f.formatSchemaSnapshotAsJSON(schema)
+	case FormatYAML:
+		return f.formatSchemaSnapshotAsYAML(schema)
+	default:
+		return "", fmt.Errorf("unsupported output format for schema snapshot: %s (only json and yaml supported)", f.format)
+	}
+}
+
 // formatValidationReportAsTable formats the validation report as a table
 func (f *Formatter) formatValidationReportAsTable(report *models.ValidationReport) string {
 	if len(report.Issues) == 0 {
@@ -659,4 +671,86 @@ func (f *Formatter) formatSchemaAsCSV(schema models.Schema) string {
 	}
 
 	return buffer.String()
+}
+
+// formatSchemaSnapshotAsJSON formats the schema snapshot as JSON (simplified format)
+func (f *Formatter) formatSchemaSnapshotAsJSON(schema models.Schema) (string, error) {
+	// Define structs to ensure proper field ordering in JSON
+	type ColumnSnapshot struct {
+		Name string `json:"Name"`
+		Type string `json:"Type"`
+	}
+
+	type TableSnapshot struct {
+		Name    string           `json:"Name"`
+		Columns []ColumnSnapshot `json:"Columns"`
+	}
+
+	// Create simplified snapshot format like postgres.-96.json
+	snapshot := make([]TableSnapshot, 0, len(schema))
+
+	for _, table := range schema {
+		tableSnapshot := TableSnapshot{
+			Name:    table.TableName,
+			Columns: make([]ColumnSnapshot, 0, len(table.Columns)),
+		}
+
+		// Add columns with name and type information
+		for _, column := range table.Columns {
+			columnSnapshot := ColumnSnapshot{
+				Name: column.ColumnName,
+				Type: column.GetFullDataType(), // This will now preserve vendor-specific names
+			}
+			tableSnapshot.Columns = append(tableSnapshot.Columns, columnSnapshot)
+		}
+
+		snapshot = append(snapshot, tableSnapshot)
+	}
+
+	data, err := json.MarshalIndent(snapshot, "", "    ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal schema snapshot to JSON: %w", err)
+	}
+	return string(data), nil
+}
+
+// formatSchemaSnapshotAsYAML formats the schema snapshot as YAML (simplified format)
+func (f *Formatter) formatSchemaSnapshotAsYAML(schema models.Schema) (string, error) {
+	// Define structs to ensure proper field ordering in YAML
+	type ColumnSnapshot struct {
+		Name string `yaml:"Name"`
+		Type string `yaml:"Type"`
+	}
+
+	type TableSnapshot struct {
+		Name    string           `yaml:"Name"`
+		Columns []ColumnSnapshot `yaml:"Columns"`
+	}
+
+	// Create simplified snapshot format
+	snapshot := make([]TableSnapshot, 0, len(schema))
+
+	for _, table := range schema {
+		tableSnapshot := TableSnapshot{
+			Name:    table.TableName,
+			Columns: make([]ColumnSnapshot, 0, len(table.Columns)),
+		}
+
+		// Add columns with name and type information
+		for _, column := range table.Columns {
+			columnSnapshot := ColumnSnapshot{
+				Name: column.ColumnName,
+				Type: column.GetFullDataType(), // This will now preserve vendor-specific names
+			}
+			tableSnapshot.Columns = append(tableSnapshot.Columns, columnSnapshot)
+		}
+
+		snapshot = append(snapshot, tableSnapshot)
+	}
+
+	data, err := yaml.Marshal(snapshot)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal schema snapshot to YAML: %w", err)
+	}
+	return string(data), nil
 }

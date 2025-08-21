@@ -22,9 +22,6 @@ func (c *Column) GetFullDataType() string {
 	if c.CharacterMaxLength != nil && *c.CharacterMaxLength > 0 {
 		switch dataType {
 		case "character varying", "varchar", "char", "character", "text":
-			if dataType == "character varying" {
-				dataType = "varchar"
-			}
 			if *c.CharacterMaxLength < 2147483647 { // Not MAX length
 				return fmt.Sprintf("%s(%d)", dataType, *c.CharacterMaxLength)
 			}
