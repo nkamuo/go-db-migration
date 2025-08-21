@@ -58,6 +58,25 @@ type ReportSummary struct {
 	IssuesByType  map[string]int `json:"issues_by_type" yaml:"issues_by_type"`
 }
 
+// SchemaInfo represents schema information for display
+type SchemaInfo struct {
+	SchemaFile       string            `json:"schema_file" yaml:"schema_file"`
+	TotalTables      int               `json:"total_tables" yaml:"total_tables"`
+	TotalColumns     int               `json:"total_columns" yaml:"total_columns"`
+	TotalForeignKeys int               `json:"total_foreign_keys" yaml:"total_foreign_keys"`
+	NotNullColumns   int               `json:"not_null_columns" yaml:"not_null_columns"`
+	NullableColumns  int               `json:"nullable_columns" yaml:"nullable_columns"`
+	DataTypeCounts   map[string]int    `json:"data_type_counts" yaml:"data_type_counts"`
+	Tables           []TableSummary    `json:"tables" yaml:"tables"`
+}
+
+// TableSummary represents a summary of a table for display
+type TableSummary struct {
+	Name            string `json:"name" yaml:"name"`
+	ColumnCount     int    `json:"column_count" yaml:"column_count"`
+	ForeignKeyCount int    `json:"foreign_key_count" yaml:"foreign_key_count"`
+}
+
 // SchemaComparison represents differences between current and target schema
 type SchemaComparison struct {
 	MissingTables    []string                   `json:"missing_tables" yaml:"missing_tables"`

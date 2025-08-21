@@ -69,6 +69,15 @@ func (d *PostgreSQLDialect) GetForeignKeysQuery() string {
 		  AND tc.table_name = $1`
 }
 
+func (d *PostgreSQLDialect) GetColumnExistsQuery() string {
+	return `
+		SELECT 1 
+		FROM information_schema.columns 
+		WHERE table_schema = 'public' 
+		  AND table_name = $1 
+		  AND column_name = $2`
+}
+
 func (d *PostgreSQLDialect) GetTableRowCountQuery(tableName string) string {
 	return fmt.Sprintf(`SELECT COUNT(*) FROM "%s"`, tableName)
 }
@@ -179,4 +188,13 @@ func (d *MySQLDialect) GetForeignKeyViolationsQuery(fk models.ForeignKey, identi
 		LIMIT 1000`,
 		fk.ColumnName, identifierCol, fk.TableName, fk.ColumnName,
 		fk.ReferencedTable, fk.ReferencedColumn, fk.ColumnName)
+}
+
+func (d *MySQLDialect) GetColumnExistsQuery() string {
+	return `
+		SELECT 1 
+		FROM information_schema.columns 
+		WHERE table_schema = DATABASE() 
+		  AND table_name = ? 
+		  AND column_name = ?`
 }

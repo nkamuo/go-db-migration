@@ -1,13 +1,14 @@
 package output
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/olekukonko/tablewriter"
 	"gopkg.in/yaml.v3"
 
 	"github.com/nkamuo/go-db-migration/internal/models"
@@ -46,6 +47,20 @@ func (f *Formatter) FormatValidationReport(report *models.ValidationReport) (str
 		return f.formatValidationReportAsCSV(report)
 	default:
 		return "", fmt.Errorf("unsupported output format: %s", f.format)
+	}
+}
+
+// FormatSchemaInfo formats schema information in the specified format
+func (f *Formatter) FormatSchemaInfo(info *models.SchemaInfo) (string, error) {
+	switch f.format {
+	case FormatTable:
+		return f.formatSchemaInfoAsTable(info), nil
+	case FormatJSON:
+		return f.formatSchemaInfoAsJSON(info)
+	case FormatYAML:
+		return f.formatSchemaInfoAsYAML(info)
+	default:
+		return "", fmt.Errorf("unsupported output format for schema info: %s", f.format)
 	}
 }
 
@@ -248,6 +263,78 @@ func (f *Formatter) formatSchemaComparisonAsYAML(comparison *models.SchemaCompar
 	return string(data), nil
 }
 
+// formatSchemaInfoAsTable formats the schema info as a table
+func (f *Formatter) formatSchemaInfoAsTable(info *models.SchemaInfo) string {
+	var output string
+
+	// Summary information table
+	summaryTable := table.NewWriter()
+	summaryTable.SetTitle("📊 Schema Summary")
+	summaryTable.AppendHeader(table.Row{"Metric", "Value"})
+	
+	summaryTable.AppendRow(table.Row{"📁 Schema File", info.SchemaFile})
+	summaryTable.AppendRow(table.Row{"🗂️  Total Tables", info.TotalTables})
+	summaryTable.AppendRow(table.Row{"📋 Total Columns", info.TotalColumns})
+	summaryTable.AppendRow(table.Row{"🔗 Foreign Keys", info.TotalForeignKeys})
+	summaryTable.AppendRow(table.Row{"🚫 NOT NULL Columns", info.NotNullColumns})
+	summaryTable.AppendRow(table.Row{"✅ Nullable Columns", info.NullableColumns})
+	
+	summaryTable.SetStyle(table.StyleColoredBright)
+	output += summaryTable.Render() + "\n\n"
+
+	// Data types table
+	if len(info.DataTypeCounts) > 0 {
+		dataTypesTable := table.NewWriter()
+		dataTypesTable.SetTitle("📊 Data Types Distribution")
+		dataTypesTable.AppendHeader(table.Row{"Data Type", "Count"})
+		
+		for dataType, count := range info.DataTypeCounts {
+			dataTypesTable.AppendRow(table.Row{dataType, count})
+		}
+		
+		dataTypesTable.SetStyle(table.StyleColoredBright)
+		output += dataTypesTable.Render() + "\n\n"
+	}
+
+	// Tables detail
+	if len(info.Tables) > 0 {
+		tablesTable := table.NewWriter()
+		tablesTable.SetTitle("📋 Tables Detail")
+		tablesTable.AppendHeader(table.Row{"Table Name", "Columns", "Foreign Keys"})
+		
+		for _, tableSummary := range info.Tables {
+			tablesTable.AppendRow(table.Row{
+				tableSummary.Name,
+				tableSummary.ColumnCount,
+				tableSummary.ForeignKeyCount,
+			})
+		}
+		
+		tablesTable.SetStyle(table.StyleColoredBright)
+		output += tablesTable.Render()
+	}
+
+	return output
+}
+
+// formatSchemaInfoAsJSON formats the schema info as JSON
+func (f *Formatter) formatSchemaInfoAsJSON(info *models.SchemaInfo) (string, error) {
+	data, err := json.MarshalIndent(info, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal schema info to JSON: %w", err)
+	}
+	return string(data), nil
+}
+
+// formatSchemaInfoAsYAML formats the schema info as YAML
+func (f *Formatter) formatSchemaInfoAsYAML(info *models.SchemaInfo) (string, error) {
+	data, err := yaml.Marshal(info)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal schema info to YAML: %w", err)
+	}
+	return string(data), nil
+}
+
 // WriteToFile writes content to a file
 func WriteToFile(content, filename string) error {
 	return os.WriteFile(filename, []byte(content), 0644)
@@ -304,4 +391,41 @@ func SaveComparisonToFile(comparison *models.SchemaComparison, filename string, 
 	}
 
 	return WriteToFile(content, filename)
+}
+
+// CreateSchemaInfo creates a SchemaInfo from a schema
+func CreateSchemaInfo(schemaFile string, schema models.Schema) *models.SchemaInfo {
+	info := &models.SchemaInfo{
+		SchemaFile:     schemaFile,
+		TotalTables:    len(schema),
+		DataTypeCounts: make(map[string]int),
+		Tables:         make([]models.TableSummary, 0, len(schema)),
+	}
+
+	for _, table := range schema {
+		// Count columns and foreign keys
+		info.TotalColumns += len(table.Columns)
+		info.TotalForeignKeys += len(table.ForeignKeys)
+
+		// Count nullable vs not null columns
+		for _, column := range table.Columns {
+			if column.IsNotNull() {
+				info.NotNullColumns++
+			} else {
+				info.NullableColumns++
+			}
+
+			// Count data types
+			info.DataTypeCounts[column.DataType]++
+		}
+
+		// Add table summary
+		info.Tables = append(info.Tables, models.TableSummary{
+			Name:            table.TableName,
+			ColumnCount:     len(table.Columns),
+			ForeignKeyCount: len(table.ForeignKeys),
+		})
+	}
+
+	return info
 }

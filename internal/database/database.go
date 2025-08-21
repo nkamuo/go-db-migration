@@ -32,6 +32,7 @@ type DatabaseDialect interface {
 	GetTablesQuery() string
 	GetColumnsQuery() string
 	GetForeignKeysQuery() string
+	GetColumnExistsQuery() string
 	BuildConnectionString(cfg *config.DBConfig) string
 	GetDriverName() string
 	GetIdentifierQuote() string
@@ -367,13 +368,7 @@ func (db *DB) getIdentifierColumn(tableName string) string {
 
 // columnExists checks if a column exists in a table
 func (db *DB) columnExists(tableName, columnName string) bool {
-	query := `
-		SELECT 1 
-		FROM information_schema.columns 
-		WHERE table_schema = 'public' 
-		  AND table_name = $1 
-		  AND column_name = $2`
-
+	query := db.dialect.GetColumnExistsQuery()
 	var exists int
 	err := db.conn.QueryRow(query, tableName, columnName).Scan(&exists)
 	return err == nil

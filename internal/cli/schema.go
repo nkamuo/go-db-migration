@@ -153,56 +153,22 @@ func newSchemaInfoCmd() *cobra.Command {
 				return fmt.Errorf("failed to load target schema: %w", err)
 			}
 
-			// Calculate statistics
-			var totalColumns int
-			var totalForeignKeys int
-			dataTypes := make(map[string]int)
-			nullableColumns := 0
-			notNullColumns := 0
+			// Create schema info
+			schemaInfo := output.CreateSchemaInfo(getSchemaFilePath(), targetSchema)
 
-			for _, table := range targetSchema {
-				totalColumns += len(table.Columns)
-				totalForeignKeys += len(table.ForeignKeys)
-
-				for _, column := range table.Columns {
-					dataTypes[column.DataType]++
-					if column.IsNotNull() {
-						notNullColumns++
-					} else {
-						nullableColumns++
-					}
-				}
+			// Format output
+			formatter := output.NewFormatter(outputFormat)
+			content, err := formatter.FormatSchemaInfo(schemaInfo)
+			if err != nil {
+				return fmt.Errorf("failed to format schema info: %w", err)
 			}
 
-			// Display information
-			fmt.Printf("📊 Schema Information\n")
-			fmt.Printf("=====================\n\n")
-			fmt.Printf("📁 Schema File: %s\n", getSchemaFilePath())
-			fmt.Printf("🗂️  Tables: %d\n", len(targetSchema))
-			fmt.Printf("📋 Total Columns: %d\n", totalColumns)
-			fmt.Printf("🔗 Foreign Keys: %d\n", totalForeignKeys)
-			fmt.Printf("🚫 NOT NULL Columns: %d\n", notNullColumns)
-			fmt.Printf("✅ Nullable Columns: %d\n", nullableColumns)
-
-			if len(dataTypes) > 0 {
-				fmt.Printf("\n📊 Data Types:\n")
-				for dataType, count := range dataTypes {
-					fmt.Printf("   %s: %d\n", dataType, count)
-				}
+			// Output or save to file
+			if outputFile != "" {
+				return output.WriteToFile(content, outputFile)
 			}
 
-			// Show table details if in verbose mode
-			if outputFormat == "table" {
-				fmt.Printf("\n📋 Tables:\n")
-				for _, table := range targetSchema {
-					fmt.Printf("   %s (%d columns", table.TableName, len(table.Columns))
-					if len(table.ForeignKeys) > 0 {
-						fmt.Printf(", %d FK", len(table.ForeignKeys))
-					}
-					fmt.Printf(")\n")
-				}
-			}
-
+			fmt.Print(content)
 			return nil
 		},
 	}
