@@ -1,7 +1,7 @@
-# Makefile for stsx-db-migration
+# Makefile for Database Migrator
 
 # Variables
-BINARY_NAME=stsx-db-migration
+BINARY_NAME=migrator
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "v1.0.0")
 BUILD_DATE=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -25,7 +25,7 @@ all: clean deps build
 
 ## build: Build the binary
 build:
-	$(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME) .
+	$(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME) ./cmd/migrator
 
 ## build-all: Build for multiple platforms
 build-all: clean deps
