@@ -1,0 +1,19 @@
+{
+    "DB": {
+        "default": {
+            "host": "localhost",
+            "port": 5432,
+            "username": "user",
+            "password": "password",
+            "database": "mydb"
+        },
+
+        "connections":[
+            {
+                "name": "JAMES Database",
+                "database": "james_db"
+            }
+        ]
+        
+    }
+}
