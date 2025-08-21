@@ -45,7 +45,7 @@ This command will:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Disable usage on error for clean output
 			cmd.SilenceUsage = true
-			
+
 			// Load configuration
 			cfg, err := getConfigFromCmd(cmd)
 			if err != nil {
@@ -153,7 +153,7 @@ This command will:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Disable usage on error for clean output
 			cmd.SilenceUsage = true
-			
+
 			// Load configuration
 			cfg, err := getConfigFromCmd(cmd)
 			if err != nil {
@@ -260,7 +260,7 @@ This is a comprehensive check that combines:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Disable usage on error for clean output
 			cmd.SilenceUsage = true
-			
+
 			// Load configuration
 			cfg, err := getConfigFromCmd(cmd)
 			if err != nil {

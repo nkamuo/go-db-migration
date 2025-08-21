@@ -233,10 +233,25 @@ func (db *DB) ValidateForeignKeys(targetSchema models.Schema) ([]models.Validati
 			if fk.TableName == "" {
 				fk.TableName = table.TableName
 			}
-			
+
 			violations, err := db.findForeignKeyViolations(fk)
 			if err != nil {
-				return nil, fmt.Errorf("failed to validate foreign key %s: %w", fk.ConstraintName, err)
+				// Instead of returning immediately, create a validation issue for the error
+				issue := models.ValidationIssue{
+					Type:     "foreign_key_validation_error",
+					Severity: "error",
+					Table:    fk.TableName,
+					Column:   fk.ColumnName,
+					Message:  fmt.Sprintf("Failed to validate foreign key '%s': %v", fk.ConstraintName, err),
+					Details: map[string]interface{}{
+						"constraint_name":   fk.ConstraintName,
+						"referenced_table":  fk.ReferencedTable,
+						"referenced_column": fk.ReferencedColumn,
+						"error_type":        "validation_error",
+					},
+				}
+				issues = append(issues, issue)
+				continue // Continue to next foreign key instead of stopping
 			}
 			issues = append(issues, violations...)
 		}
@@ -253,7 +268,21 @@ func (db *DB) findForeignKeyViolations(fk models.ForeignKey) ([]models.Validatio
 		return nil, fmt.Errorf("failed to check if source table '%s' exists: %w", fk.TableName, err)
 	}
 	if !sourceExists {
-		return nil, fmt.Errorf("source table '%s' does not exist in the database", fk.TableName)
+		// Create a validation issue instead of returning an error
+		issue := models.ValidationIssue{
+			Type:     "missing_source_table",
+			Severity: "error",
+			Table:    fk.TableName,
+			Column:   fk.ColumnName,
+			Message:  fmt.Sprintf("Source table '%s' does not exist in the database (required by foreign key constraint '%s')", fk.TableName, fk.ConstraintName),
+			Details: map[string]interface{}{
+				"constraint_name":   fk.ConstraintName,
+				"referenced_table":  fk.ReferencedTable,
+				"referenced_column": fk.ReferencedColumn,
+				"error_type":        "missing_source_table",
+			},
+		}
+		return []models.ValidationIssue{issue}, nil
 	}
 
 	referencedExists, err := db.tableExists(fk.ReferencedTable)
@@ -261,7 +290,65 @@ func (db *DB) findForeignKeyViolations(fk models.ForeignKey) ([]models.Validatio
 		return nil, fmt.Errorf("failed to check if referenced table '%s' exists: %w", fk.ReferencedTable, err)
 	}
 	if !referencedExists {
-		return nil, fmt.Errorf("referenced table '%s' does not exist in the database (required by foreign key constraint '%s')", fk.ReferencedTable, fk.ConstraintName)
+		// Create a validation issue instead of returning an error
+		issue := models.ValidationIssue{
+			Type:     "missing_referenced_table",
+			Severity: "error",
+			Table:    fk.TableName,
+			Column:   fk.ColumnName,
+			Message:  fmt.Sprintf("Referenced table '%s' does not exist in the database (required by foreign key constraint '%s')", fk.ReferencedTable, fk.ConstraintName),
+			Details: map[string]interface{}{
+				"constraint_name":   fk.ConstraintName,
+				"referenced_table":  fk.ReferencedTable,
+				"referenced_column": fk.ReferencedColumn,
+				"error_type":        "missing_referenced_table",
+			},
+		}
+		return []models.ValidationIssue{issue}, nil
+	}
+
+	// Check if the source column exists
+	sourceColExists, err := db.columnExists(fk.TableName, fk.ColumnName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if source column '%s.%s' exists: %w", fk.TableName, fk.ColumnName, err)
+	}
+	if !sourceColExists {
+		issue := models.ValidationIssue{
+			Type:     "missing_source_column",
+			Severity: "error",
+			Table:    fk.TableName,
+			Column:   fk.ColumnName,
+			Message:  fmt.Sprintf("Source column '%s.%s' does not exist in the database (required by foreign key constraint '%s')", fk.TableName, fk.ColumnName, fk.ConstraintName),
+			Details: map[string]interface{}{
+				"constraint_name":   fk.ConstraintName,
+				"referenced_table":  fk.ReferencedTable,
+				"referenced_column": fk.ReferencedColumn,
+				"error_type":        "missing_source_column",
+			},
+		}
+		return []models.ValidationIssue{issue}, nil
+	}
+
+	// Check if the referenced column exists
+	refColExists, err := db.columnExists(fk.ReferencedTable, fk.ReferencedColumn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if referenced column '%s.%s' exists: %w", fk.ReferencedTable, fk.ReferencedColumn, err)
+	}
+	if !refColExists {
+		issue := models.ValidationIssue{
+			Type:     "missing_referenced_column",
+			Severity: "error",
+			Table:    fk.TableName,
+			Column:   fk.ColumnName,
+			Message:  fmt.Sprintf("Referenced column '%s.%s' does not exist in the database (required by foreign key constraint '%s')", fk.ReferencedTable, fk.ReferencedColumn, fk.ConstraintName),
+			Details: map[string]interface{}{
+				"constraint_name":   fk.ConstraintName,
+				"referenced_table":  fk.ReferencedTable,
+				"referenced_column": fk.ReferencedColumn,
+				"error_type":        "missing_referenced_column",
+			},
+		}
+		return []models.ValidationIssue{issue}, nil
 	}
 
 	// Build query to find orphaned records
@@ -394,7 +481,8 @@ func (db *DB) getIdentifierColumn(tableName string) string {
 	}
 
 	for _, pk := range possiblePKs {
-		if db.columnExists(tableName, pk) {
+		exists, err := db.columnExists(tableName, pk)
+		if err == nil && exists {
 			return pk
 		}
 	}
@@ -409,11 +497,17 @@ func (db *DB) getIdentifierColumn(tableName string) string {
 }
 
 // columnExists checks if a column exists in a table
-func (db *DB) columnExists(tableName, columnName string) bool {
+func (db *DB) columnExists(tableName, columnName string) (bool, error) {
 	query := db.dialect.GetColumnExistsQuery()
 	var exists int
 	err := db.conn.QueryRow(query, tableName, columnName).Scan(&exists)
-	return err == nil
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // GetTableRowCount returns the number of rows in a table
