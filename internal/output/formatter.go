@@ -78,6 +78,22 @@ func (f *Formatter) FormatSchemaComparison(comparison *models.SchemaComparison) 
 	}
 }
 
+// FormatSchema formats a raw schema in the specified format
+func (f *Formatter) FormatSchema(schema models.Schema) (string, error) {
+	switch f.format {
+	case FormatTable:
+		return f.formatSchemaAsTable(schema), nil
+	case FormatJSON:
+		return f.formatSchemaAsJSON(schema)
+	case FormatYAML:
+		return f.formatSchemaAsYAML(schema)
+	case FormatCSV:
+		return f.formatSchemaAsCSV(schema), nil
+	default:
+		return "", fmt.Errorf("unsupported output format for schema: %s", f.format)
+	}
+}
+
 // formatValidationReportAsTable formats the validation report as a table
 func (f *Formatter) formatValidationReportAsTable(report *models.ValidationReport) string {
 	if len(report.Issues) == 0 {
@@ -441,4 +457,206 @@ func CreateSchemaInfo(schemaFile string, schema models.Schema) *models.SchemaInf
 	}
 
 	return info
+}
+
+// formatSchemaAsTable formats the schema as a table
+func (f *Formatter) formatSchemaAsTable(schema models.Schema) string {
+	if len(schema) == 0 {
+		return "📝 No tables found in schema\n"
+	}
+
+	var buffer bytes.Buffer
+	buffer.WriteString(fmt.Sprintf("📊 Database Schema (%d tables)\n\n", len(schema)))
+
+	for _, table := range schema {
+		buffer.WriteString(fmt.Sprintf("📋 Table: %s\n", table.TableName))
+
+		// Columns table
+		if len(table.Columns) > 0 {
+			columnsTable := tablewriter.NewWriter(&buffer)
+			columnsTable.Header("Column", "Type", "Nullable", "Default")
+
+			for _, column := range table.Columns {
+				defaultVal := "NULL"
+				if column.DefaultValue != nil {
+					defaultVal = fmt.Sprintf("%v", column.DefaultValue)
+				}
+
+				nullable := "YES"
+				if column.IsNullable == "NO" {
+					nullable = "NO"
+				}
+
+				columnsTable.Append([]string{
+					column.ColumnName,
+					column.GetFullDataType(),
+					nullable,
+					defaultVal,
+				})
+			}
+			columnsTable.Render()
+		}
+
+		// Foreign keys table
+		if len(table.ForeignKeys) > 0 {
+			buffer.WriteString(fmt.Sprintf("\n🔗 Foreign Keys for %s:\n", table.TableName))
+			fkTable := tablewriter.NewWriter(&buffer)
+			fkTable.Header("Constraint", "Column", "References", "Update Rule", "Delete Rule")
+
+			for _, fk := range table.ForeignKeys {
+				fkTable.Append([]string{
+					fk.ConstraintName,
+					fk.ColumnName,
+					fmt.Sprintf("%s.%s", fk.ReferencedTable, fk.ReferencedColumn),
+					fk.UpdateRule,
+					fk.DeleteRule,
+				})
+			}
+			fkTable.Render()
+		}
+
+		buffer.WriteString("\n")
+	}
+
+	return buffer.String()
+}
+
+// formatSchemaAsJSON formats the schema as JSON
+func (f *Formatter) formatSchemaAsJSON(schema models.Schema) (string, error) {
+	// Create a transformed schema with full data types for export
+	transformedSchema := make([]map[string]interface{}, 0, len(schema))
+
+	for _, table := range schema {
+		transformedTable := map[string]interface{}{
+			"TableName":   table.TableName,
+			"Columns":     make([]map[string]interface{}, 0, len(table.Columns)),
+			"ForeignKeys": table.ForeignKeys,
+		}
+
+		// Transform columns to use full data type
+		for _, column := range table.Columns {
+			transformedColumn := map[string]interface{}{
+				"ColumnName":   column.ColumnName,
+				"DataType":     column.GetFullDataType(), // Use full data type with sizing
+				"DefaultValue": column.DefaultValue,
+				"IsNullable":   column.IsNullable,
+			}
+
+			// Include sizing information as separate fields for reference
+			if column.CharacterMaxLength != nil {
+				transformedColumn["CharacterMaxLength"] = *column.CharacterMaxLength
+			}
+			if column.NumericPrecision != nil {
+				transformedColumn["NumericPrecision"] = *column.NumericPrecision
+			}
+			if column.NumericScale != nil {
+				transformedColumn["NumericScale"] = *column.NumericScale
+			}
+			if column.DatetimePrecision != nil {
+				transformedColumn["DatetimePrecision"] = *column.DatetimePrecision
+			}
+
+			transformedTable["Columns"] = append(transformedTable["Columns"].([]map[string]interface{}), transformedColumn)
+		}
+
+		transformedSchema = append(transformedSchema, transformedTable)
+	}
+
+	data, err := json.MarshalIndent(transformedSchema, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal schema to JSON: %w", err)
+	}
+	return string(data), nil
+}
+
+// formatSchemaAsYAML formats the schema as YAML
+func (f *Formatter) formatSchemaAsYAML(schema models.Schema) (string, error) {
+	// Create a transformed schema with full data types for export (same as JSON)
+	transformedSchema := make([]map[string]interface{}, 0, len(schema))
+
+	for _, table := range schema {
+		transformedTable := map[string]interface{}{
+			"TableName":   table.TableName,
+			"Columns":     make([]map[string]interface{}, 0, len(table.Columns)),
+			"ForeignKeys": table.ForeignKeys,
+		}
+
+		// Transform columns to use full data type
+		for _, column := range table.Columns {
+			transformedColumn := map[string]interface{}{
+				"ColumnName":   column.ColumnName,
+				"DataType":     column.GetFullDataType(), // Use full data type with sizing
+				"DefaultValue": column.DefaultValue,
+				"IsNullable":   column.IsNullable,
+			}
+
+			// Include sizing information as separate fields for reference
+			if column.CharacterMaxLength != nil {
+				transformedColumn["CharacterMaxLength"] = *column.CharacterMaxLength
+			}
+			if column.NumericPrecision != nil {
+				transformedColumn["NumericPrecision"] = *column.NumericPrecision
+			}
+			if column.NumericScale != nil {
+				transformedColumn["NumericScale"] = *column.NumericScale
+			}
+			if column.DatetimePrecision != nil {
+				transformedColumn["DatetimePrecision"] = *column.DatetimePrecision
+			}
+
+			transformedTable["Columns"] = append(transformedTable["Columns"].([]map[string]interface{}), transformedColumn)
+		}
+
+		transformedSchema = append(transformedSchema, transformedTable)
+	}
+
+	data, err := yaml.Marshal(transformedSchema)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal schema to YAML: %w", err)
+	}
+	return string(data), nil
+}
+
+// formatSchemaAsCSV formats the schema as CSV
+func (f *Formatter) formatSchemaAsCSV(schema models.Schema) string {
+	var buffer bytes.Buffer
+
+	// CSV Header
+	buffer.WriteString("Table,Column,DataType,IsNullable,DefaultValue,ConstraintName,ReferencedTable,ReferencedColumn\n")
+
+	for _, table := range schema {
+		for _, column := range table.Columns {
+			defaultVal := ""
+			if column.DefaultValue != nil {
+				defaultVal = fmt.Sprintf("%v", column.DefaultValue)
+			}
+
+			// Find foreign key for this column if any
+			constraintName := ""
+			referencedTable := ""
+			referencedColumn := ""
+
+			for _, fk := range table.ForeignKeys {
+				if fk.ColumnName == column.ColumnName {
+					constraintName = fk.ConstraintName
+					referencedTable = fk.ReferencedTable
+					referencedColumn = fk.ReferencedColumn
+					break
+				}
+			}
+
+			buffer.WriteString(fmt.Sprintf("%s,%s,%s,%s,\"%s\",%s,%s,%s\n",
+				table.TableName,
+				column.ColumnName,
+				column.GetFullDataType(),
+				column.IsNullable,
+				defaultVal,
+				constraintName,
+				referencedTable,
+				referencedColumn,
+			))
+		}
+	}
+
+	return buffer.String()
 }

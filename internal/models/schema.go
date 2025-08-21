@@ -1,11 +1,56 @@
 package models
 
+import "fmt"
+
 // Column represents a database column from the schema
 type Column struct {
-	ColumnName   string      `json:"ColumnName"`
-	DataType     string      `json:"DataType"`
-	DefaultValue interface{} `json:"DefaultValue"`
-	IsNullable   string      `json:"IsNullable"`
+	ColumnName         string      `json:"ColumnName"`
+	DataType           string      `json:"DataType"`
+	DefaultValue       interface{} `json:"DefaultValue"`
+	IsNullable         string      `json:"IsNullable"`
+	CharacterMaxLength *int        `json:"CharacterMaxLength,omitempty"`
+	NumericPrecision   *int        `json:"NumericPrecision,omitempty"`
+	NumericScale       *int        `json:"NumericScale,omitempty"`
+	DatetimePrecision  *int        `json:"DatetimePrecision,omitempty"`
+}
+
+// GetFullDataType returns the data type with size information
+func (c *Column) GetFullDataType() string {
+	dataType := c.DataType
+
+	// Add character length for string types
+	if c.CharacterMaxLength != nil && *c.CharacterMaxLength > 0 {
+		switch dataType {
+		case "character varying", "varchar", "char", "character", "text":
+			if dataType == "character varying" {
+				dataType = "varchar"
+			}
+			if *c.CharacterMaxLength < 2147483647 { // Not MAX length
+				return fmt.Sprintf("%s(%d)", dataType, *c.CharacterMaxLength)
+			}
+		}
+	}
+
+	// Add precision and scale for numeric types
+	if c.NumericPrecision != nil && *c.NumericPrecision > 0 {
+		switch dataType {
+		case "numeric", "decimal", "money":
+			if c.NumericScale != nil && *c.NumericScale > 0 {
+				return fmt.Sprintf("%s(%d,%d)", dataType, *c.NumericPrecision, *c.NumericScale)
+			}
+			return fmt.Sprintf("%s(%d)", dataType, *c.NumericPrecision)
+		}
+	}
+
+	// Add precision for datetime types
+	if c.DatetimePrecision != nil && *c.DatetimePrecision > 0 {
+		switch dataType {
+		case "timestamp", "time", "interval":
+			return fmt.Sprintf("%s(%d)", dataType, *c.DatetimePrecision)
+		}
+	}
+
+	return dataType
 }
 
 // ForeignKey represents a foreign key constraint

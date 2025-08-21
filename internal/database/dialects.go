@@ -42,7 +42,11 @@ func (d *PostgreSQLDialect) GetColumnsQuery() string {
 			column_name,
 			data_type,
 			column_default,
-			is_nullable
+			is_nullable,
+			character_maximum_length,
+			numeric_precision,
+			numeric_scale,
+			datetime_precision
 		FROM information_schema.columns 
 		WHERE table_schema = 'public' 
 		  AND table_name = $1
@@ -136,7 +140,11 @@ func (d *MySQLDialect) GetColumnsQuery() string {
 			column_name,
 			data_type,
 			column_default,
-			is_nullable
+			is_nullable,
+			character_maximum_length,
+			numeric_precision,
+			numeric_scale,
+			datetime_precision
 		FROM information_schema.columns 
 		WHERE table_schema = DATABASE()
 		  AND table_name = ?

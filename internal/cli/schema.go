@@ -22,6 +22,7 @@ validating schema files, and generating schema reports.`,
 	cmd.AddCommand(newSchemaCompareCmd())
 	cmd.AddCommand(newSchemaValidateCmd())
 	cmd.AddCommand(newSchemaInfoCmd())
+	cmd.AddCommand(newSchemaExportCmd())
 
 	return cmd
 }
@@ -169,6 +170,106 @@ func newSchemaInfoCmd() *cobra.Command {
 			}
 
 			fmt.Print(content)
+			return nil
+		},
+	}
+}
+
+// newSchemaExportCmd creates the schema export command
+func newSchemaExportCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "export",
+		Short: "Export database schema to file",
+		Long: `Export the current database schema to a JSON file or other formats.
+This command connects to the database and extracts the complete schema including:
+- Table structures with proper data types and sizes
+- Column definitions with constraints
+- Foreign key relationships
+- Default values and nullability
+
+The exported schema can be used as input for validation and comparison commands.`,
+		Aliases: []string{"dump", "extract"},
+
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Disable usage on error for clean output
+			cmd.SilenceUsage = true
+
+			// Load configuration
+			cfg, err := getConfigFromCmd(cmd)
+			if err != nil {
+				fmt.Printf("❌ Configuration Error\n\n")
+				fmt.Printf("Failed to load configuration: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Check if conf.json exists in the current directory\n")
+				fmt.Printf("   • Verify JSON syntax is valid\n")
+				fmt.Printf("   • Use --config flag to specify a different config file\n\n")
+				return nil
+			}
+
+			// Get connection config
+			dbConfig, err := cfg.GetConnectionConfig(connectionName)
+			if err != nil {
+				fmt.Printf("❌ Connection Configuration Error\n\n")
+				fmt.Printf("Failed to get connection config: %v\n\n", err)
+				fmt.Printf("💡 Solutions:\n")
+				fmt.Printf("   • Check connection name in conf.json\n")
+				fmt.Printf("   • Use --connection flag to specify a valid connection\n")
+				fmt.Printf("   • Verify default connection is properly configured\n\n")
+				return nil
+			}
+
+			// Connect to database
+			db, err := database.NewConnection(dbConfig)
+			if err != nil {
+				fmt.Printf("❌ Database Connection Failed\n\n")
+				fmt.Printf("Database: %s\n", dbConfig.Database)
+				fmt.Printf("Host: %s:%d\n", dbConfig.Host, dbConfig.Port)
+				fmt.Printf("User: %s\n\n", dbConfig.Username)
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify database server is running\n")
+				fmt.Printf("   • Check connection details in config are correct\n")
+				fmt.Printf("   • Ensure user has required permissions\n")
+				fmt.Printf("   • Check firewall/network connectivity\n")
+				fmt.Printf("   • Verify pg_hba.conf allows your IP address\n\n")
+				return nil
+			}
+			defer db.Close()
+
+			// Export current schema
+			fmt.Printf("🔄 Exporting schema from database '%s'...\n", dbConfig.Database)
+			currentSchema, err := db.GetCurrentSchema()
+			if err != nil {
+				fmt.Printf("❌ Schema Export Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				fmt.Printf("💡 Common Solutions:\n")
+				fmt.Printf("   • Verify user has permission to read schema information\n")
+				fmt.Printf("   • Check if database contains tables in 'public' schema\n")
+				fmt.Printf("   • Ensure database connection is stable\n\n")
+				return nil
+			}
+
+			// Format and output results
+			formatter := output.NewFormatter(outputFormat)
+			content, err := formatter.FormatSchema(currentSchema)
+			if err != nil {
+				fmt.Printf("❌ Output Formatting Failed\n\n")
+				fmt.Printf("Error: %v\n\n", err)
+				return nil
+			}
+
+			// Save or print output
+			err = saveOutput(content, cmd)
+			if err != nil {
+				fmt.Printf("❌ Failed to save output: %v\n", err)
+				return nil
+			}
+
+			fmt.Printf("✅ Schema exported successfully\n")
+			if outputPath := cmd.Flag("output").Value.String(); outputPath != "" {
+				fmt.Printf("📁 Saved to: %s\n", outputPath)
+			}
+
 			return nil
 		},
 	}

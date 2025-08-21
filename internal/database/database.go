@@ -155,18 +155,46 @@ func (db *DB) getTableColumns(tableName string) ([]models.Column, error) {
 	for rows.Next() {
 		var column models.Column
 		var defaultValue sql.NullString
+		var charMaxLength sql.NullInt64
+		var numericPrecision sql.NullInt64
+		var numericScale sql.NullInt64
+		var datetimePrecision sql.NullInt64
 
 		if err := rows.Scan(
 			&column.ColumnName,
 			&column.DataType,
 			&defaultValue,
 			&column.IsNullable,
+			&charMaxLength,
+			&numericPrecision,
+			&numericScale,
+			&datetimePrecision,
 		); err != nil {
 			return nil, err
 		}
 
 		if defaultValue.Valid {
 			column.DefaultValue = defaultValue.String
+		}
+
+		if charMaxLength.Valid {
+			val := int(charMaxLength.Int64)
+			column.CharacterMaxLength = &val
+		}
+
+		if numericPrecision.Valid {
+			val := int(numericPrecision.Int64)
+			column.NumericPrecision = &val
+		}
+
+		if numericScale.Valid {
+			val := int(numericScale.Int64)
+			column.NumericScale = &val
+		}
+
+		if datetimePrecision.Valid {
+			val := int(datetimePrecision.Int64)
+			column.DatetimePrecision = &val
 		}
 
 		columns = append(columns, column)
