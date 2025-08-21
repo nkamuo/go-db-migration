@@ -66,14 +66,21 @@ basic connectivity checks.`,
 			}
 			defer db.Close()
 
+			// Test basic query to ensure connection is working
+			err = db.Ping()
+			if err != nil {
+				fmt.Printf("❌ Connection ping failed: %v\n", err)
+				return fmt.Errorf("connection test failed")
+			}
+
 			fmt.Printf("✅ Connection successful!\n")
 
-			// Get some basic database info
-			currentSchema, err := db.GetCurrentSchema()
+			// Try to get table count without full schema retrieval
+			tables, err := db.GetTableList()
 			if err != nil {
-				fmt.Printf("⚠️  Warning: Could not retrieve schema information: %v\n", err)
+				fmt.Printf("⚠️  Warning: Could not retrieve table list: %v\n", err)
 			} else {
-				fmt.Printf("📊 Found %d tables in database\n", len(currentSchema))
+				fmt.Printf("📊 Found %d tables in database\n", len(tables))
 			}
 
 			return nil

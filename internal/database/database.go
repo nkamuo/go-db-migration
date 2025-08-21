@@ -121,6 +121,16 @@ func (db *DB) GetCurrentSchema() (models.Schema, error) {
 	return schema, nil
 }
 
+// Ping tests the database connection
+func (db *DB) Ping() error {
+	return db.conn.Ping()
+}
+
+// GetTableList retrieves just the table names without full schema
+func (db *DB) GetTableList() ([]string, error) {
+	return db.getTables()
+}
+
 // getTables retrieves all table names from the database
 func (db *DB) getTables() ([]string, error) {
 	query := db.dialect.GetTablesQuery()
@@ -379,23 +389,9 @@ func (db *DB) findForeignKeyViolations(fk models.ForeignKey) ([]models.Validatio
 		return []models.ValidationIssue{issue}, nil
 	}
 
-	// Build query to find orphaned records
-	query := fmt.Sprintf(`
-		SELECT %s, %s
-		FROM %s AS source_table
-		WHERE %s IS NOT NULL
-		  AND NOT EXISTS (
-			SELECT 1 FROM %s AS ref_table
-			WHERE ref_table.%s = source_table.%s
-		  )
-		LIMIT 1000`, // Limit to prevent overwhelming output
-		fk.ColumnName,
-		db.getIdentifierColumn(fk.TableName),
-		fk.TableName,
-		fk.ColumnName,
-		fk.ReferencedTable,
-		fk.ReferencedColumn,
-		fk.ColumnName)
+	// Build query to find orphaned records using dialect
+	identifierCol := db.getIdentifierColumn(fk.TableName)
+	query := db.dialect.GetForeignKeyViolationsQuery(fk, identifierCol)
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
@@ -457,14 +453,7 @@ func (db *DB) ValidateNotNullConstraints(targetSchema models.Schema) ([]models.V
 func (db *DB) findNullViolations(tableName string, column models.Column) ([]models.ValidationIssue, error) {
 	identifierCol := db.getIdentifierColumn(tableName)
 
-	query := fmt.Sprintf(`
-		SELECT %s
-		FROM %s
-		WHERE %s IS NULL
-		LIMIT 1000`, // Limit to prevent overwhelming output
-		identifierCol,
-		tableName,
-		column.ColumnName)
+	query := db.dialect.GetNullViolationsQuery(tableName, column.ColumnName, identifierCol)
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
@@ -540,7 +529,7 @@ func (db *DB) columnExists(tableName, columnName string) (bool, error) {
 
 // GetTableRowCount returns the number of rows in a table
 func (db *DB) GetTableRowCount(tableName string) (int64, error) {
-	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)
+	query := db.dialect.GetTableRowCountQuery(tableName)
 	var count int64
 	err := db.conn.QueryRow(query).Scan(&count)
 	return count, err
