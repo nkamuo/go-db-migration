@@ -23,8 +23,8 @@ func newVersionCmd() *cobra.Command {
 Git commit hash, build date, and Go runtime information.`,
 
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("STSX Database Migration Tool\n")
-			fmt.Printf("============================\n\n")
+			fmt.Printf("Database Migrator\n")
+			fmt.Printf("================\n\n")
 			fmt.Printf("Version:    %s\n", Version)
 			fmt.Printf("Git Commit: %s\n", GitCommit)
 			fmt.Printf("Build Date: %s\n", BuildDate)
