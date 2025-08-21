@@ -4,23 +4,61 @@ import (
 	"database/sql"
 	"fmt"
 
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
+	
 	"github.com/nkamuo/go-db-migration/internal/config"
 	"github.com/nkamuo/go-db-migration/internal/models"
 )
 
-// DB represents a database connection wrapper
+// DatabaseType represents supported database types
+type DatabaseType string
+
+const (
+	PostgreSQL DatabaseType = "postgres"
+	MySQL      DatabaseType = "mysql"
+)
+
+// DB represents a database connection wrapper with multi-vendor support
 type DB struct {
-	conn   *sql.DB
-	config *config.DBConfig
+	conn     *sql.DB
+	config   *config.DBConfig
+	dbType   DatabaseType
+	dialect  DatabaseDialect
 }
 
-// NewConnection creates a new database connection
-func NewConnection(cfg *config.DBConfig) (*DB, error) {
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		cfg.Host, cfg.Port, cfg.Username, cfg.Password, cfg.Database)
+// DatabaseDialect interface for vendor-specific SQL queries
+type DatabaseDialect interface {
+	GetTablesQuery() string
+	GetColumnsQuery() string
+	GetForeignKeysQuery() string
+	BuildConnectionString(cfg *config.DBConfig) string
+	GetDriverName() string
+	GetIdentifierQuote() string
+	GetTableRowCountQuery(tableName string) string
+	GetNullViolationsQuery(tableName, columnName, identifierCol string) string
+	GetForeignKeyViolationsQuery(fk models.ForeignKey, identifierCol string) string
+}
 
-	conn, err := sql.Open("postgres", connStr)
+// NewConnection creates a new database connection with the appropriate dialect
+func NewConnection(cfg *config.DBConfig) (*DB, error) {
+	dbType := DatabaseType(cfg.Type)
+	if dbType == "" {
+		dbType = PostgreSQL // Default to PostgreSQL
+	}
+
+	var dialect DatabaseDialect
+	switch dbType {
+	case PostgreSQL:
+		dialect = &PostgreSQLDialect{}
+	case MySQL:
+		dialect = &MySQLDialect{}
+	default:
+		return nil, fmt.Errorf("unsupported database type: %s", cfg.Type)
+	}
+
+	connStr := dialect.BuildConnectionString(cfg)
+	conn, err := sql.Open(dialect.GetDriverName(), connStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
@@ -30,7 +68,12 @@ func NewConnection(cfg *config.DBConfig) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &DB{conn: conn, config: cfg}, nil
+	return &DB{
+		conn:    conn,
+		config:  cfg,
+		dbType:  dbType,
+		dialect: dialect,
+	}, nil
 }
 
 // Close closes the database connection
@@ -39,6 +82,11 @@ func (db *DB) Close() error {
 		return db.conn.Close()
 	}
 	return nil
+}
+
+// GetDatabaseType returns the database type
+func (db *DB) GetDatabaseType() DatabaseType {
+	return db.dbType
 }
 
 // GetCurrentSchema retrieves the current database schema
@@ -74,13 +122,7 @@ func (db *DB) GetCurrentSchema() (models.Schema, error) {
 
 // getTables retrieves all table names from the database
 func (db *DB) getTables() ([]string, error) {
-	query := `
-		SELECT table_name 
-		FROM information_schema.tables 
-		WHERE table_schema = 'public' 
-		  AND table_type = 'BASE TABLE'
-		ORDER BY table_name`
-
+	query := db.dialect.GetTablesQuery()
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, err
@@ -101,17 +143,7 @@ func (db *DB) getTables() ([]string, error) {
 
 // getTableColumns retrieves all columns for a specific table
 func (db *DB) getTableColumns(tableName string) ([]models.Column, error) {
-	query := `
-		SELECT 
-			column_name,
-			data_type,
-			column_default,
-			is_nullable
-		FROM information_schema.columns 
-		WHERE table_schema = 'public' 
-		  AND table_name = $1
-		ORDER BY ordinal_position`
-
+	query := db.dialect.GetColumnsQuery()
 	rows, err := db.conn.Query(query, tableName)
 	if err != nil {
 		return nil, err
@@ -144,25 +176,7 @@ func (db *DB) getTableColumns(tableName string) ([]models.Column, error) {
 
 // getTableForeignKeys retrieves all foreign keys for a specific table
 func (db *DB) getTableForeignKeys(tableName string) ([]models.ForeignKey, error) {
-	query := `
-		SELECT 
-			tc.constraint_name,
-			tc.table_name,
-			kcu.column_name,
-			ccu.table_name AS foreign_table_name,
-			ccu.column_name AS foreign_column_name,
-			rc.update_rule,
-			rc.delete_rule
-		FROM information_schema.table_constraints AS tc 
-		JOIN information_schema.key_column_usage AS kcu
-			ON tc.constraint_name = kcu.constraint_name
-		JOIN information_schema.constraint_column_usage AS ccu
-			ON ccu.constraint_name = tc.constraint_name
-		JOIN information_schema.referential_constraints AS rc
-			ON tc.constraint_name = rc.constraint_name
-		WHERE tc.constraint_type = 'FOREIGN KEY' 
-		  AND tc.table_name = $1`
-
+	query := db.dialect.GetForeignKeysQuery()
 	rows, err := db.conn.Query(query, tableName)
 	if err != nil {
 		return nil, err

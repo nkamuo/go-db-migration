@@ -10,21 +10,25 @@ import (
 
 // DBConfig represents a database configuration
 type DBConfig struct {
+	Type     string `json:"type" yaml:"type" mapstructure:"type"`             // postgres, mysql
 	Host     string `json:"host" yaml:"host" mapstructure:"host"`
 	Port     int    `json:"port" yaml:"port" mapstructure:"port"`
 	Username string `json:"username" yaml:"username" mapstructure:"username"`
 	Password string `json:"password" yaml:"password" mapstructure:"password"`
 	Database string `json:"database" yaml:"database" mapstructure:"database"`
+	SSLMode  string `json:"sslmode,omitempty" yaml:"sslmode,omitempty" mapstructure:"sslmode"` // For PostgreSQL
 }
 
 // Connection represents a named database connection
 type Connection struct {
 	Name     string `json:"name" yaml:"name" mapstructure:"name"`
+	Type     string `json:"type,omitempty" yaml:"type,omitempty" mapstructure:"type"`
 	Host     string `json:"host,omitempty" yaml:"host,omitempty" mapstructure:"host"`
 	Port     int    `json:"port,omitempty" yaml:"port,omitempty" mapstructure:"port"`
 	Username string `json:"username,omitempty" yaml:"username,omitempty" mapstructure:"username"`
 	Password string `json:"password,omitempty" yaml:"password,omitempty" mapstructure:"password"`
 	Database string `json:"database,omitempty" yaml:"database,omitempty" mapstructure:"database"`
+	SSLMode  string `json:"sslmode,omitempty" yaml:"sslmode,omitempty" mapstructure:"sslmode"`
 }
 
 // Config represents the main configuration structure
@@ -47,6 +51,9 @@ func (c *Config) GetConnectionConfig(connectionName string) (*DBConfig, error) {
 		if conn.Name == connectionName {
 			// Merge with defaults for any missing values
 			config := c.DB.Default
+			if conn.Type != "" {
+				config.Type = conn.Type
+			}
 			if conn.Host != "" {
 				config.Host = conn.Host
 			}
@@ -62,6 +69,9 @@ func (c *Config) GetConnectionConfig(connectionName string) (*DBConfig, error) {
 			if conn.Database != "" {
 				config.Database = conn.Database
 			}
+			if conn.SSLMode != "" {
+				config.SSLMode = conn.SSLMode
+			}
 			return &config, nil
 		}
 	}
@@ -71,6 +81,14 @@ func (c *Config) GetConnectionConfig(connectionName string) (*DBConfig, error) {
 
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
+	// Validate default database type
+	if c.DB.Default.Type == "" {
+		c.DB.Default.Type = "postgres" // Default to postgres
+	}
+	if c.DB.Default.Type != "postgres" && c.DB.Default.Type != "mysql" {
+		return fmt.Errorf("default database type must be 'postgres' or 'mysql', got '%s'", c.DB.Default.Type)
+	}
+	
 	if c.DB.Default.Host == "" {
 		return fmt.Errorf("default database host is required")
 	}
@@ -88,6 +106,10 @@ func (c *Config) Validate() error {
 	for i, conn := range c.DB.Connections {
 		if conn.Name == "" {
 			return fmt.Errorf("connection at index %d must have a name", i)
+		}
+		// Validate connection type if specified
+		if conn.Type != "" && conn.Type != "postgres" && conn.Type != "mysql" {
+			return fmt.Errorf("connection '%s' has invalid type '%s', must be 'postgres' or 'mysql'", conn.Name, conn.Type)
 		}
 	}
 
