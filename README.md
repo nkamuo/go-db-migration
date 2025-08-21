@@ -7,6 +7,7 @@ A robust Go program designed to identify potential issues that could prevent suc
 - **Foreign Key Validation**: Identifies records that would violate foreign key constraints during migration
 - **NOT NULL Constraint Validation**: Finds null values in columns that will be made NOT NULL
 - **Schema Comparison**: Compares current database schema with target schema
+- **Schema File Comparison**: Compare two schema files directly without database connections
 - **Schema Export**: Export complete database schema with vendor-specific data types and full metadata
 - **Schema Snapshots**: Create simplified schema snapshots for version tracking and quick comparisons
 - **Multiple Output Formats**: Supports table, JSON, YAML, and CSV output formats
@@ -125,8 +126,12 @@ go install ./cmd/migrator
 # Check NOT NULL constraints
 ./bin/migrator validate null
 
-# Compare current vs target schema
+# Compare current database vs target schema file
 ./bin/migrator schema compare
+
+# Compare two schema files directly (no database connection needed)
+./bin/migrator schema diff schema-v1.json schema-v2.json
+./bin/migrator schema diff --source current.json --target new.json --format json
 
 # Run all validations
 ./bin/migrator validate all
@@ -169,6 +174,52 @@ go install ./cmd/migrator
 
 # Get help for specific command
 ./bin/migrator validate --help
+```
+
+### Schema Commands
+
+The tool provides several schema-related commands for different use cases:
+
+#### `schema compare`
+Compares a live database schema with a target schema file. Requires a database connection.
+```bash
+# Compare current database with target schema file
+./bin/migrator schema compare --connection production --schema target-schema.json
+```
+
+#### `schema diff`
+Compares two schema files directly without requiring database connections. Perfect for:
+- Comparing different versions of schema files
+- Validating schema changes before deployment
+- Code review processes
+
+```bash
+# Compare two schema files using positional arguments
+./bin/migrator schema diff schema-v1.json schema-v2.json
+
+# Compare using flags with custom output
+./bin/migrator schema diff --source current.json --target new.json --format json -o diff.json
+```
+
+#### `schema export`
+Exports the complete database schema with full metadata and vendor-specific data types.
+```bash
+# Export full schema with PostgreSQL-specific types like "character varying(100)"
+./bin/migrator schema export --format json -o full-schema.json
+```
+
+#### `schema snapshot`
+Creates simplified schema snapshots optimized for version tracking and quick comparisons.
+```bash
+# Create lightweight snapshot for version control
+./bin/migrator schema snapshot --format json -o schema-v1.0.0.json
+```
+
+#### `schema validate`
+Validates schema file structure for consistency and correctness.
+```bash
+# Check schema file for structural issues
+./bin/migrator schema validate --schema my-schema.json
 ```
 
 ## Schema File Format

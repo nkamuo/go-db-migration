@@ -118,7 +118,9 @@ func compareTableStructures(currentTable, targetTable *models.Table) models.Tabl
 
 // areColumnsEqual compares two columns for equality
 func areColumnsEqual(current, target *models.Column) bool {
-	return current.DataType == target.DataType &&
+	// Use GetFullDataType() for both columns to ensure consistent comparison
+	// This handles vendor-specific formatting and proper type sizing
+	return current.GetFullDataType() == target.GetFullDataType() &&
 		current.IsNullable == target.IsNullable &&
 		fmt.Sprintf("%v", current.DefaultValue) == fmt.Sprintf("%v", target.DefaultValue)
 }

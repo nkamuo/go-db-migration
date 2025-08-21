@@ -20,6 +20,7 @@ validating schema files, and generating schema reports.`,
 	}
 
 	cmd.AddCommand(newSchemaCompareCmd())
+	cmd.AddCommand(newSchemaDiffCmd())
 	cmd.AddCommand(newSchemaValidateCmd())
 	cmd.AddCommand(newSchemaInfoCmd())
 	cmd.AddCommand(newSchemaExportCmd())
@@ -42,7 +43,7 @@ This command will:
 - Compare column definitions and constraints
 - Highlight foreign key differences
 - Support multiple output formats for detailed analysis`,
-		Aliases: []string{"diff", "compare-schema"},
+		Aliases: []string{"compare-schema"},
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Load configuration
@@ -89,6 +90,98 @@ This command will:
 			return saveOutput(content, cmd)
 		},
 	}
+}
+
+// newSchemaDiffCmd creates the schema diff command for comparing two schema files
+func newSchemaDiffCmd() *cobra.Command {
+	var sourceSchemaPath string
+	var targetSchemaPath string
+
+	cmd := &cobra.Command{
+		Use:   "diff [source-schema] [target-schema]",
+		Short: "Compare two schema files",
+		Long: `Compares two schema files to identify structural differences.
+
+This command compares schema files directly without requiring database connections.
+It will:
+- Compare table structures between source and target schema files
+- Identify missing, extra, or modified tables
+- Compare column definitions and constraints
+- Highlight foreign key differences
+- Support multiple output formats for detailed analysis
+
+Examples:
+  migrator schema diff schema-v1.json schema-v2.json
+  migrator schema diff --source current-schema.json --target new-schema.json
+  migrator schema diff schema1.json schema2.json --format json --output diff.json`,
+
+		Args: func(cmd *cobra.Command, args []string) error {
+			// Allow either positional arguments OR flags, but not both
+			hasFlags := sourceSchemaPath != "" || targetSchemaPath != ""
+			hasArgs := len(args) >= 1
+
+			if hasFlags && hasArgs {
+				return fmt.Errorf("cannot use both positional arguments and --source/--target flags")
+			}
+
+			if !hasFlags && len(args) < 1 {
+				return fmt.Errorf("requires either positional arguments or --source/--target flags")
+			}
+
+			if hasArgs && len(args) < 2 {
+				return fmt.Errorf("requires exactly 2 arguments when using positional form: source-schema target-schema")
+			}
+
+			if hasFlags && (sourceSchemaPath == "" || targetSchemaPath == "") {
+				return fmt.Errorf("both --source and --target flags are required when using flag form")
+			}
+
+			return nil
+		},
+
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var sourceFile, targetFile string
+
+			// Determine source and target files
+			if len(args) >= 2 {
+				sourceFile = args[0]
+				targetFile = args[1]
+			} else {
+				sourceFile = sourceSchemaPath
+				targetFile = targetSchemaPath
+			}
+
+			// Load source schema
+			sourceSchema, err := schema.LoadSchema(sourceFile)
+			if err != nil {
+				return fmt.Errorf("failed to load source schema from %s: %w", sourceFile, err)
+			}
+
+			// Load target schema
+			targetSchema, err := schema.LoadSchema(targetFile)
+			if err != nil {
+				return fmt.Errorf("failed to load target schema from %s: %w", targetFile, err)
+			}
+
+			// Compare schemas
+			comparison := schema.CompareSchemas(sourceSchema, targetSchema)
+
+			// Format and output results
+			formatter := output.NewFormatter(outputFormat)
+			content, err := formatter.FormatSchemaComparison(comparison)
+			if err != nil {
+				return fmt.Errorf("failed to format output: %w", err)
+			}
+
+			return saveOutput(content, cmd)
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringVar(&sourceSchemaPath, "source", "", "source schema file")
+	cmd.Flags().StringVar(&targetSchemaPath, "target", "", "target schema file")
+
+	return cmd
 }
 
 // newSchemaValidateCmd creates the schema validate command

@@ -245,7 +245,7 @@ func (f *Formatter) formatSchemaComparisonAsTable(comparison *models.SchemaCompa
 				table.Append([]string{
 					"MISSING",
 					col.ColumnName,
-					fmt.Sprintf("%s, %s", col.DataType, col.IsNullable),
+					fmt.Sprintf("%s, %s", col.GetFullDataType(), col.IsNullable),
 				})
 			}
 
@@ -253,7 +253,7 @@ func (f *Formatter) formatSchemaComparisonAsTable(comparison *models.SchemaCompa
 				table.Append([]string{
 					"EXTRA",
 					col.ColumnName,
-					fmt.Sprintf("%s, %s", col.DataType, col.IsNullable),
+					fmt.Sprintf("%s, %s", col.GetFullDataType(), col.IsNullable),
 				})
 			}
 
@@ -262,8 +262,8 @@ func (f *Formatter) formatSchemaComparisonAsTable(comparison *models.SchemaCompa
 					"MODIFIED",
 					colName,
 					fmt.Sprintf("Current: %s (%s) → Target: %s (%s)",
-						colDiff.Current.DataType, colDiff.Current.IsNullable,
-						colDiff.Target.DataType, colDiff.Target.IsNullable),
+						colDiff.Current.GetFullDataType(), colDiff.Current.IsNullable,
+						colDiff.Target.GetFullDataType(), colDiff.Target.IsNullable),
 				})
 			}
 
