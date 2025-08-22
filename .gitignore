@@ -4,3 +4,4 @@
 
 # Ignore distribution directory
 /dist
+/.prompts

@@ -19,6 +19,14 @@ type DBConfig struct {
 	SSLMode  string `json:"sslmode,omitempty" yaml:"sslmode,omitempty" mapstructure:"sslmode"` // For PostgreSQL
 }
 
+// ValidationConfig represents validation behavior configuration
+type ValidationConfig struct {
+	IgnoreMissingTables  bool `json:"ignore_missing_tables" yaml:"ignore_missing_tables" mapstructure:"ignore_missing_tables"`
+	IgnoreMissingColumns bool `json:"ignore_missing_columns" yaml:"ignore_missing_columns" mapstructure:"ignore_missing_columns"`
+	StopOnFirstError     bool `json:"stop_on_first_error" yaml:"stop_on_first_error" mapstructure:"stop_on_first_error"`
+	MaxIssuesPerTable    int  `json:"max_issues_per_table" yaml:"max_issues_per_table" mapstructure:"max_issues_per_table"`
+}
+
 // Connection represents a named database connection
 type Connection struct {
 	Name     string `json:"name" yaml:"name" mapstructure:"name"`
@@ -37,6 +45,7 @@ type Config struct {
 		Default     DBConfig     `json:"default" yaml:"default" mapstructure:"default"`
 		Connections []Connection `json:"connections" yaml:"connections" mapstructure:"connections"`
 	} `json:"DB" yaml:"DB" mapstructure:"DB"`
+	Validation ValidationConfig `json:"validation" yaml:"validation" mapstructure:"validation"`
 }
 
 // GetConnectionConfig returns the database configuration for a given connection name
@@ -147,6 +156,16 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// GetValidationConfig returns the validation configuration with defaults
+func (c *Config) GetValidationConfig() ValidationConfig {
+	// Set defaults if not specified
+	validationConfig := c.Validation
+	if validationConfig.MaxIssuesPerTable == 0 {
+		validationConfig.MaxIssuesPerTable = 1000 // Default limit
+	}
+	return validationConfig
 }
 
 // GetDefaultSchemaPath returns the default path for the schema file

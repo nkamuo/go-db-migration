@@ -431,15 +431,100 @@ func (db *DB) findForeignKeyViolations(fk models.ForeignKey) ([]models.Validatio
 
 // ValidateNotNullConstraints checks for null values in columns that should be NOT NULL
 func (db *DB) ValidateNotNullConstraints(targetSchema models.Schema) ([]models.ValidationIssue, error) {
+	return db.ValidateNotNullConstraintsWithConfig(targetSchema, nil)
+}
+
+// ValidateNotNullConstraintsWithConfig checks for null values with validation configuration
+func (db *DB) ValidateNotNullConstraintsWithConfig(targetSchema models.Schema, validationConfig *config.ValidationConfig) ([]models.ValidationIssue, error) {
 	var issues []models.ValidationIssue
+	var defaultConfig config.ValidationConfig
+
+	if validationConfig == nil {
+		defaultConfig = config.ValidationConfig{
+			IgnoreMissingTables:  false,
+			IgnoreMissingColumns: false,
+			StopOnFirstError:     false,
+			MaxIssuesPerTable:    1000,
+		}
+		validationConfig = &defaultConfig
+	}
 
 	for _, table := range targetSchema {
+		// Check if table exists
+		tableExists, err := db.tableExists(table.TableName)
+		if err != nil {
+			if validationConfig.StopOnFirstError {
+				return nil, fmt.Errorf("failed to check if table %s exists: %w", table.TableName, err)
+			}
+			// Add as validation issue and continue
+			issues = append(issues, models.ValidationIssue{
+				Type:     "table_check_error",
+				Severity: "error",
+				Table:    table.TableName,
+				Message:  fmt.Sprintf("Failed to check if table exists: %v", err),
+			})
+			continue
+		}
+
+		if !tableExists {
+			if validationConfig.IgnoreMissingTables {
+				continue // Skip this table
+			}
+			// Add as validation issue
+			issues = append(issues, models.ValidationIssue{
+				Type:     "missing_table",
+				Severity: "warning",
+				Table:    table.TableName,
+				Message:  fmt.Sprintf("Table '%s' does not exist in database", table.TableName),
+			})
+			continue
+		}
+
 		for _, column := range table.Columns {
 			if column.IsNotNull() {
-				violations, err := db.findNullViolations(table.TableName, column)
+				// Check if column exists
+				columnExists, err := db.columnExists(table.TableName, column.ColumnName)
 				if err != nil {
-					return nil, fmt.Errorf("failed to validate NOT NULL constraint for %s.%s: %w",
-						table.TableName, column.ColumnName, err)
+					if validationConfig.StopOnFirstError {
+						return nil, fmt.Errorf("failed to check if column %s.%s exists: %w", table.TableName, column.ColumnName, err)
+					}
+					issues = append(issues, models.ValidationIssue{
+						Type:     "column_check_error",
+						Severity: "error",
+						Table:    table.TableName,
+						Column:   column.ColumnName,
+						Message:  fmt.Sprintf("Failed to check if column exists: %v", err),
+					})
+					continue
+				}
+
+				if !columnExists {
+					if validationConfig.IgnoreMissingColumns {
+						continue // Skip this column
+					}
+					issues = append(issues, models.ValidationIssue{
+						Type:     "missing_column",
+						Severity: "warning",
+						Table:    table.TableName,
+						Column:   column.ColumnName,
+						Message:  fmt.Sprintf("Column '%s.%s' does not exist in database", table.TableName, column.ColumnName),
+					})
+					continue
+				}
+
+				violations, err := db.findNullViolations(table.TableName, column, validationConfig.MaxIssuesPerTable)
+				if err != nil {
+					if validationConfig.StopOnFirstError {
+						return nil, fmt.Errorf("failed to validate NOT NULL constraint for %s.%s: %w", table.TableName, column.ColumnName, err)
+					}
+					issues = append(issues, models.ValidationIssue{
+						Type:     "validation_error",
+						Severity: "error",
+						Table:    table.TableName,
+						Column:   column.ColumnName,
+						Message:  fmt.Sprintf("Failed to validate NOT NULL constraint: %v", err),
+					})
+					continue
 				}
 				issues = append(issues, violations...)
 			}
@@ -450,10 +535,20 @@ func (db *DB) ValidateNotNullConstraints(targetSchema models.Schema) ([]models.V
 }
 
 // findNullViolations finds records with null values in columns that should be NOT NULL
-func (db *DB) findNullViolations(tableName string, column models.Column) ([]models.ValidationIssue, error) {
+func (db *DB) findNullViolations(tableName string, column models.Column, maxIssues ...int) ([]models.ValidationIssue, error) {
+	limit := 1000 // Default limit
+	if len(maxIssues) > 0 && maxIssues[0] > 0 {
+		limit = maxIssues[0]
+	}
+
 	identifierCol := db.getIdentifierColumn(tableName)
 
-	query := db.dialect.GetNullViolationsQuery(tableName, column.ColumnName, identifierCol)
+	// Build query with custom limit (using quoted identifiers for PostgreSQL compatibility)
+	query := fmt.Sprintf(`
+		SELECT "%s"
+		FROM "%s"
+		WHERE "%s" IS NULL
+		LIMIT %d`, identifierCol, tableName, column.ColumnName, limit)
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
@@ -533,4 +628,242 @@ func (db *DB) GetTableRowCount(tableName string) (int64, error) {
 	var count int64
 	err := db.conn.QueryRow(query).Scan(&count)
 	return count, err
+}
+
+// FixForeignKeyViolations fixes foreign key constraint violations
+func (db *DB) FixForeignKeyViolations(targetSchema models.Schema, action string, dryRun bool, validationConfig *config.ValidationConfig) (models.FixResults, error) {
+	results := make(models.FixResults)
+
+	for _, table := range targetSchema {
+		for _, fk := range table.ForeignKeys {
+			// Ensure the foreign key has the table name set (it might not be in the JSON)
+			if fk.TableName == "" {
+				fk.TableName = table.TableName
+			}
+			
+			tableName := fk.TableName
+			if _, exists := results[tableName]; !exists {
+				results[tableName] = models.FixResult{}
+			}
+
+			// Find violations first
+			violations, err := db.findForeignKeyViolations(fk)
+			if err != nil {
+				if validationConfig != nil && validationConfig.IgnoreMissingTables {
+					continue
+				}
+				result := results[tableName]
+				result.Error = err.Error()
+				results[tableName] = result
+				continue
+			}
+
+			violationCount := len(violations)
+			if violationCount == 0 {
+				continue
+			}
+
+			result := results[tableName]
+			result.IssuesFound += violationCount
+
+			if !dryRun {
+				var recordsAffected int
+				var fixErr error
+
+				switch action {
+				case "remove":
+					recordsAffected, fixErr = db.removeForeignKeyViolatingRecords(fk)
+				case "set-null":
+					recordsAffected, fixErr = db.setForeignKeyColumnsToNull(fk)
+				default:
+					fixErr = fmt.Errorf("unknown action: %s", action)
+				}
+
+				if fixErr != nil {
+					result.Error = fixErr.Error()
+					result.Success = false
+				} else {
+					result.RecordsAffected += recordsAffected
+					result.Success = true
+				}
+			} else {
+				// In dry-run mode, count what would be affected
+				result.RecordsAffected += violationCount
+				result.Success = true
+				result.Details = fmt.Sprintf("Would %s %d records", action, violationCount)
+			}
+
+			results[tableName] = result
+		}
+	}
+
+	return results, nil
+}
+
+// FixNullValueViolations fixes NULL value violations for NOT NULL constraints
+func (db *DB) FixNullValueViolations(targetSchema models.Schema, action, defaultValue string, dryRun bool, validationConfig *config.ValidationConfig) (models.FixResults, error) {
+	results := make(models.FixResults)
+
+	for _, table := range targetSchema {
+		tableName := table.TableName
+		if _, exists := results[tableName]; !exists {
+			results[tableName] = models.FixResult{}
+		}
+
+		for _, column := range table.Columns {
+			if !column.IsNotNull() {
+				continue
+			}
+
+			// Check if table/column exists
+			if validationConfig != nil {
+				if validationConfig.IgnoreMissingTables {
+					tableExists, _ := db.tableExists(tableName)
+					if !tableExists {
+						continue
+					}
+				}
+				if validationConfig.IgnoreMissingColumns {
+					columnExists, _ := db.columnExists(tableName, column.ColumnName)
+					if !columnExists {
+						continue
+					}
+				}
+			}
+
+			// Find null violations
+			violations, err := db.findNullViolations(tableName, column)
+			if err != nil {
+				result := results[tableName]
+				result.Error = err.Error()
+				results[tableName] = result
+				continue
+			}
+
+			violationCount := len(violations)
+			if violationCount == 0 {
+				continue
+			}
+
+			result := results[tableName]
+			result.IssuesFound += violationCount
+
+			if !dryRun {
+				var recordsAffected int
+				var fixErr error
+
+				switch action {
+				case "remove":
+					recordsAffected, fixErr = db.removeNullValueRecords(tableName, column.ColumnName)
+				case "set-default":
+					recordsAffected, fixErr = db.setNullValuesToDefault(tableName, column.ColumnName, defaultValue)
+				default:
+					fixErr = fmt.Errorf("unknown action: %s", action)
+				}
+
+				if fixErr != nil {
+					result.Error = fixErr.Error()
+					result.Success = false
+				} else {
+					result.RecordsAffected += recordsAffected
+					result.Success = true
+				}
+			} else {
+				// In dry-run mode, count what would be affected
+				result.RecordsAffected += violationCount
+				result.Success = true
+				result.Details = fmt.Sprintf("Would %s %d records in column %s", action, violationCount, column.ColumnName)
+			}
+
+			results[tableName] = result
+		}
+	}
+
+	return results, nil
+}
+
+// Helper methods for actual fix operations
+
+func (db *DB) removeForeignKeyViolatingRecords(fk models.ForeignKey) (int, error) {
+	query := fmt.Sprintf(`
+		DELETE FROM "%s"
+		WHERE "%s" IS NOT NULL
+		  AND NOT EXISTS (
+			SELECT 1 FROM "%s" AS ref_table
+			WHERE ref_table."%s" = "%s"."%s"
+		  )`,
+		fk.TableName,
+		fk.ColumnName,
+		fk.ReferencedTable,
+		fk.ReferencedColumn,
+		fk.TableName,
+		fk.ColumnName)
+
+	result, err := db.conn.Exec(query)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	return int(rowsAffected), err
+}
+
+func (db *DB) setForeignKeyColumnsToNull(fk models.ForeignKey) (int, error) {
+	query := fmt.Sprintf(`
+		UPDATE "%s"
+		SET "%s" = NULL
+		WHERE "%s" IS NOT NULL
+		  AND NOT EXISTS (
+			SELECT 1 FROM "%s" AS ref_table
+			WHERE ref_table."%s" = "%s"."%s"
+		  )`,
+		fk.TableName,
+		fk.ColumnName,
+		fk.ColumnName,
+		fk.ReferencedTable,
+		fk.ReferencedColumn,
+		fk.TableName,
+		fk.ColumnName)
+
+	result, err := db.conn.Exec(query)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	return int(rowsAffected), err
+}
+
+func (db *DB) removeNullValueRecords(tableName, columnName string) (int, error) {
+	query := fmt.Sprintf(`
+		DELETE FROM "%s"
+		WHERE "%s" IS NULL`,
+		tableName,
+		columnName)
+
+	result, err := db.conn.Exec(query)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	return int(rowsAffected), err
+}
+
+func (db *DB) setNullValuesToDefault(tableName, columnName, defaultValue string) (int, error) {
+	query := fmt.Sprintf(`
+		UPDATE "%s"
+		SET "%s" = $1
+		WHERE "%s" IS NULL`,
+		tableName,
+		columnName,
+		columnName)
+
+	result, err := db.conn.Exec(query, defaultValue)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	return int(rowsAffected), err
 }

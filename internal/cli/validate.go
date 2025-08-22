@@ -3,12 +3,31 @@ package cli
 import (
 	"fmt"
 
+	"github.com/nkamuo/go-db-migration/internal/config"
 	"github.com/nkamuo/go-db-migration/internal/database"
 	"github.com/nkamuo/go-db-migration/internal/models"
 	"github.com/nkamuo/go-db-migration/internal/output"
 	"github.com/nkamuo/go-db-migration/internal/schema"
 	"github.com/spf13/cobra"
 )
+
+// Validation configuration flags
+var (
+	ignoreMissingTables  bool
+	ignoreMissingColumns bool
+	stopOnFirstError     bool
+	maxIssuesPerTable    int
+)
+
+// getValidationConfigFromFlags creates validation config from command line flags
+func getValidationConfigFromFlags() config.ValidationConfig {
+	return config.ValidationConfig{
+		IgnoreMissingTables:  ignoreMissingTables,
+		IgnoreMissingColumns: ignoreMissingColumns,
+		StopOnFirstError:     stopOnFirstError,
+		MaxIssuesPerTable:    maxIssuesPerTable,
+	}
+}
 
 // newValidateCmd creates the validate command group
 func newValidateCmd() *cobra.Command {
@@ -23,6 +42,12 @@ constraints, and comprehensive validation checks.`,
 	cmd.AddCommand(newValidateFKCmd())
 	cmd.AddCommand(newValidateNullCmd())
 	cmd.AddCommand(newValidateAllCmd())
+
+	// Add persistent flags that apply to all validate subcommands
+	cmd.PersistentFlags().BoolVar(&ignoreMissingTables, "ignore-missing-tables", false, "Skip validation for missing tables")
+	cmd.PersistentFlags().BoolVar(&ignoreMissingColumns, "ignore-missing-columns", false, "Skip validation for missing columns")
+	cmd.PersistentFlags().BoolVar(&stopOnFirstError, "stop-on-error", false, "Stop validation on first error")
+	cmd.PersistentFlags().IntVar(&maxIssuesPerTable, "max-issues", 1000, "Maximum issues to report per table")
 
 	return cmd
 }
@@ -209,8 +234,9 @@ This command will:
 				return nil
 			}
 
-			// Validate NOT NULL constraints
-			issues, err := db.ValidateNotNullConstraints(targetSchema)
+			// Validate NOT NULL constraints with configuration
+			validationConfig := getValidationConfigFromFlags()
+			issues, err := db.ValidateNotNullConstraintsWithConfig(targetSchema, &validationConfig)
 			if err != nil {
 				fmt.Printf("❌ NOT NULL Validation Failed\n\n")
 				fmt.Printf("Error: %v\n\n", err)

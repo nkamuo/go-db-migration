@@ -187,3 +187,15 @@ func (t *Table) GetPrimaryKeyColumns() []Column {
 	}
 	return pkColumns
 }
+
+// FixResult represents the result of a fix operation
+type FixResult struct {
+	IssuesFound     int    `json:"issues_found"`
+	RecordsAffected int    `json:"records_affected"`
+	Success         bool   `json:"success"`
+	Error           string `json:"error,omitempty"`
+	Details         string `json:"details,omitempty"`
+}
+
+// FixResults represents results for multiple tables
+type FixResults map[string]FixResult

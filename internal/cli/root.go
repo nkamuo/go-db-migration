@@ -83,6 +83,7 @@ func init() {
 	rootCmd.AddCommand(newValidateCmd())
 	rootCmd.AddCommand(newSchemaCmd())
 	rootCmd.AddCommand(newConnectionCmd())
+	rootCmd.AddCommand(newFixCmd())
 	rootCmd.AddCommand(newVersionCmd())
 }
 
