@@ -12,7 +12,7 @@ A robust Go program designed to identify potential issues that could prevent suc
 - **Schema Snapshots**: Create simplified schema snapshots for version tracking and quick comparisons
 - **Multiple Output Formats**: Supports table, JSON, YAML, and CSV output formats
 - **Flexible Configuration**: Supports multiple database connections with fallback to defaults
-- **Enterprise-Ready**: Robust error handling, logging, and validation
+
 
 ## Installation
 

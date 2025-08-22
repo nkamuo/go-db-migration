@@ -1,0 +1,20 @@
+[
+    {
+        "TableName": "permission_groups",
+        "Columns": [
+            {
+                "ColumnName": "id",
+                "DataType": "bigint",
+                "DefaultValue": "nextval('permission_groups_id_seq'::regclass)",
+                "IsNullable": "NO"
+            },
+            {
+                "ColumnName": "desc",
+                "DataType": "character varying(256)",
+                "DefaultValue": null,
+                "IsNullable": "NO"
+            }
+        ],
+        "ForeignKeys": []
+    }
+]

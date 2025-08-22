@@ -1,0 +1,44 @@
+[
+    {
+        "TableName": "addresses",
+        "Columns": [
+            {
+                "ColumnName": "address_id",
+                "DataType": "character varying(36)",
+                "DefaultValue": null,
+                "IsNullable": "NO"
+            },
+            {
+                "ColumnName": "line1",
+                "DataType": "character varying(150)",
+                "DefaultValue": null,
+                "IsNullable": "YES"
+            },
+            {
+                "ColumnName": "line2",
+                "DataType": "character varying(100)",
+                "DefaultValue": null,
+                "IsNullable": "YES"
+            },
+            {
+                "ColumnName": "city",
+                "DataType": "character varying(50)",
+                "DefaultValue": null,
+                "IsNullable": "YES"
+            },
+            {
+                "ColumnName": "state",
+                "DataType": "character varying(20)",
+                "DefaultValue": null,
+                "IsNullable": "YES"
+            },
+            {
+                "ColumnName": "zip_code",
+                "DataType": "character varying(15)",
+                "DefaultValue": null,
+                "IsNullable": "YES"
+            }
+        ],
+        "ForeignKeys": []
+    }
+]
